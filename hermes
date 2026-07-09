@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.0.1"
+VERSION="5.1.0"
 CODENAME="Omni"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -28,10 +28,15 @@ GATEWAY_BACKUP="https://certve-webhook.certveis.workers.dev"
 CF_AI="https://cf-ai.certveis.workers.dev"
 LINKS_HUB="https://rocspace-links.certveis.workers.dev"
 CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"
+ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 
 # ─── Firebase ────────────────────────────────────────────────────────────────
 FIREBASE_PROJECT="planning-with-ai-36675"
 FIREBASE_API_KEY="AIzaSyAPH8DG8Ji6Zjcid3s6qtnU9J8qBKGrpOQ"
+
+# ─── GCP / Cloud Run ────────────────────────────────────────────────────────
+GCP_PROJECT="819208434965"
+GCP_REGION="us-west1"
 
 # ─── GitHub ──────────────────────────────────────────────────────────────────
 GH_USER="ivansslo"
@@ -61,6 +66,7 @@ GITHUB_PAT="${GITHUB_PAT:-}"
 MONGO_URI="${MONGO_URI:-}"
 VOYAGE_KEY="${VOYAGE_KEY:-}"
 SOLACE_URL="${SOLACE_URL:-}"
+ISDOCKER_GEMINI_KEY="${ISDOCKER_GEMINI_KEY:-}"
 MODEL="${MODEL:-}"
 PROVIDER="${PROVIDER:-groq}"
 
@@ -809,9 +815,10 @@ cmd_links() {
   echo -e "    Links Hub:   $LINKS_HUB"
   echo ""
   echo -e "  ${B}Cloud Run:${N}"
-  echo -e "    Dashboard:   $CLOUDRUN/dashboard"
+  echo -e "    ai-vitality: $CLOUDRUN/dashboard"
   echo -e "    Chat:        $CLOUDRUN/chat-live"
   echo -e "    API:         $CLOUDRUN/api"
+  echo -e "    isdocker:    $ISDOCKER"
   echo ""
   echo -e "  ${G}Firebase:${N}"
   echo -e "    Console:     https://console.firebase.google.com/project/$FIREBASE_PROJECT"
@@ -857,6 +864,421 @@ cmd_update() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  DOCTOR — Comprehensive Diagnostic
+# ═════════════════════════════════════════════════════════════════════════════
+cmd_doctor() {
+  header
+  echo -e "${BOLD}🩺 Hermes Doctor — Full Diagnostic${N}\n"
+
+  local pass=0 fail=0 warn=0
+
+  check() {
+    local name="$1" status="$2" detail="${3:-}"
+    case "$status" in
+      ok)   printf "  ${G}✅${N} %-35s %s\n" "$name" "$detail"; pass=$((pass+1)) ;;
+      fail) printf "  ${R}❌${N} %-35s %s\n" "$name" "$detail"; fail=$((fail+1)) ;;
+      warn) printf "  ${Y}⚠️${N}  %-35s %s\n" "$name" "$detail"; warn=$((warn+1)) ;;
+    esac
+  }
+
+  # ── 1. System ──
+  echo -e "  ${Y}── System ──${N}"
+  command -v python3 &>/dev/null && check "Python3" "ok" "$(python3 --version 2>&1)" || check "Python3" "fail" "not found"
+  command -v node &>/dev/null && check "Node.js" "ok" "$(node --version 2>/dev/null)" || check "Node.js" "warn" "not found"
+  command -v git &>/dev/null && check "Git" "ok" "$(git --version 2>/dev/null | cut -d' ' -f3)" || check "Git" "fail" "not found"
+  command -v curl &>/dev/null && check "curl" "ok" "installed" || check "curl" "fail" "not found"
+  command -v jq &>/dev/null && check "jq" "ok" "installed" || check "jq" "warn" "not found (optional)"
+  command -v udocker &>/dev/null && check "udocker" "ok" "installed" || check "udocker" "warn" "not found (for containers)"
+  echo ""
+
+  # ── 2. API Keys ──
+  echo -e "  ${Y}── API Keys ──${N}"
+  [ -n "$TOKEN" ] && check "TOKEN" "ok" "${TOKEN:0:12}..." || check "TOKEN" "fail" "not set"
+  [ -n "$GROQ_KEY" ] && check "GROQ_KEY" "ok" "${GROQ_KEY:0:12}..." || check "GROQ_KEY" "fail" "not set"
+  [ -n "$OR_KEY" ] && check "OR_KEY" "ok" "${OR_KEY:0:12}..." || check "OR_KEY" "fail" "not set"
+  [ -n "$GEMINI_KEY" ] && check "GEMINI_KEY" "ok" "${GEMINI_KEY:0:12}..." || check "GEMINI_KEY" "fail" "not set"
+  [ -n "$ISDOCKER_GEMINI_KEY" ] && check "ISDOCKER_GEMINI_KEY" "ok" "${ISDOCKER_GEMINI_KEY:0:12}..." || check "ISDOCKER_GEMINI_KEY" "warn" "not set"
+  [ -n "$CF_TOKEN" ] && check "CF_TOKEN" "ok" "${CF_TOKEN:0:12}..." || check "CF_TOKEN" "warn" "not set"
+  [ -n "$CF_AI_TOKEN" ] && check "CF_AI_TOKEN" "ok" "${CF_AI_TOKEN:0:12}..." || check "CF_AI_TOKEN" "warn" "not set"
+  [ -n "$GITHUB_PAT" ] && check "GITHUB_PAT" "ok" "${GITHUB_PAT:0:16}..." || check "GITHUB_PAT" "fail" "not set"
+  [ -n "$VOYAGE_KEY" ] && check "VOYAGE_KEY" "ok" "${VOYAGE_KEY:0:12}..." || check "VOYAGE_KEY" "warn" "not set"
+  [ -n "$MONGO_URI" ] && check "MONGO_URI" "ok" "configured" || check "MONGO_URI" "warn" "not set"
+  [ -n "$SOLACE_URL" ] && check "SOLACE_URL" "ok" "configured" || check "SOLACE_URL" "warn" "not set"
+  echo ""
+
+  # ── 3. Live Endpoints ──
+  echo -e "  ${Y}── Live Endpoints ──${N}"
+  for entry in \
+    "hermes-cloudflare|$GATEWAY/health" \
+    "hermes-webhook|$GATEWAY_MIRROR/health" \
+    "certve-webhook|$GATEWAY_BACKUP/health" \
+    "cf-ai-factory|$CF_AI/models" \
+    "rocspace-links|$LINKS_HUB/" \
+    "ai-vitality (Cloud Run)|$CLOUDRUN/health" \
+    "isdocker (Cloud Run)|$ISDOCKER"; do
+    local name="${entry%%|*}"
+    local url="${entry##*|}"
+    local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$url" 2>/dev/null || echo "000")
+    if [ "$code" = "200" ]; then
+      check "$name" "ok" "HTTP $code"
+    elif [ "$code" = "403" ]; then
+      check "$name" "ok" "HTTP $code (CF protection, alive)"
+    elif [ "$code" = "000" ]; then
+      check "$name" "fail" "TIMEOUT"
+    else
+      check "$name" "warn" "HTTP $code"
+    fi
+  done
+  echo ""
+
+  # ── 4. AI Provider Live Test ──
+  echo -e "  ${Y}── AI Provider Test ──${N}"
+  if [ -n "$GROQ_KEY" ]; then
+    local r=$(curl -s --max-time 10 -X POST "https://api.groq.com/openai/v1/chat/completions" \
+      -H "Authorization: Bearer $GROQ_KEY" -H "Content-Type: application/json" \
+      -d '{"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' 2>/dev/null)
+    echo "$r" | grep -q '"choices"' && check "Groq API" "ok" "Response OK" || check "Groq API" "fail" "$(echo "$r" | head -c 80)"
+  else
+    check "Groq API" "warn" "No key"
+  fi
+
+  if [ -n "$OR_KEY" ]; then
+    local r=$(curl -s --max-time 10 -H "Authorization: Bearer $OR_KEY" "https://openrouter.ai/api/v1/models" 2>/dev/null | head -c 100)
+    echo "$r" | grep -q '"data"' && check "OpenRouter API" "ok" "Models list OK" || check "OpenRouter API" "fail" "Cannot reach"
+  else
+    check "OpenRouter API" "warn" "No key"
+  fi
+
+  if [ -n "$GEMINI_KEY" ]; then
+    local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_KEY" 2>/dev/null)
+    [ "$code" = "200" ] && check "Gemini API" "ok" "HTTP $code" || check "Gemini API" "fail" "HTTP $code"
+  else
+    check "Gemini API" "warn" "No key"
+  fi
+
+  if [ -n "$GITHUB_PAT" ]; then
+    local user=$(curl -s --max-time 10 -H "Authorization: token $GITHUB_PAT" "https://api.github.com/user" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('login','?'))" 2>/dev/null)
+    [ "$user" != "?" ] && check "GitHub API" "ok" "User: $user" || check "GitHub API" "fail" "PAT expired"
+  else
+    check "GitHub API" "warn" "No PAT"
+  fi
+  echo ""
+
+  # ── 5. GCP / Cloud Run ──
+  echo -e "  ${Y}── GCP / Cloud Run ──${N}"
+  check "GCP Project" "ok" "$GCP_PROJECT"
+  check "GCP Region" "ok" "$GCP_REGION"
+  local cr_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$CLOUDRUN/health" 2>/dev/null)
+  [ "$cr_code" = "200" ] && check "ai-vitality service" "ok" "HTTP $cr_code" || check "ai-vitality service" "warn" "HTTP $cr_code"
+  local isd_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$ISDOCKER" 2>/dev/null)
+  [ "$isd_code" = "200" ] && check "isdocker service" "ok" "HTTP $isd_code" || check "isdocker service" "warn" "HTTP $isd_code"
+  echo ""
+
+  # ── 6. File System ──
+  echo -e "  ${Y}── File System ──${N}"
+  [ -d "$HERMES_DIR" ] && check "HERMES_DIR" "ok" "$HERMES_DIR" || check "HERMES_DIR" "warn" "not created yet"
+  [ -f "$HERMES_KEYS" ] && check "Keys file" "ok" "$HERMES_KEYS" || check "Keys file" "warn" "not saved (run setup)"
+  [ -d "$HERMES_WORKSPACE" ] && check "Workspace" "ok" "$HERMES_WORKSPACE" || check "Workspace" "warn" "not created"
+  echo ""
+
+  # ── Summary ──
+  local total=$((pass+fail+warn))
+  echo -e "  ${B}══════════════════════════════════════════════════════${N}"
+  printf "  ${B}║${N}  Total: %d  |  ${G}✅ %d${N}  |  ${R}❌ %d${N}  |  ${Y}⚠️  %d${N}\n" "$total" "$pass" "$fail" "$warn"
+  echo -e "  ${B}══════════════════════════════════════════════════════${N}"
+
+  if [ "$fail" -gt 0 ]; then
+    echo ""
+    echo -e "  ${Y}Run ${BOLD}hermes fix${N}${Y} to auto-repair issues${N}"
+  fi
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  ISDOCKER — Container Manager + Cloud Run Integration
+# ═════════════════════════════════════════════════════════════════════════════
+cmd_isdocker() {
+  local action="${1:-status}"
+  shift 2>/dev/null || true
+
+  header
+  echo -e "${BOLD}🐳 isdocker — Container Manager${N}"
+  echo -e "  ${D}Cloud Run: $ISDOCKER${N}"
+  echo -e "  ${D}GCP Project: $GCP_PROJECT | Region: $GCP_REGION${N}\n"
+
+  case "$action" in
+    status)
+      echo -e "  ${Y}── Cloud Run Services ──${N}"
+      for svc in "ai-vitality" "isdocker"; do
+        local url="https://${svc}-${GCP_PROJECT}.${GCP_REGION}.run.app"
+        local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$url" 2>/dev/null || echo "000")
+        if [ "$code" = "200" ]; then
+          printf "  ${G}✅${N} %-25s HTTP %s  %s\n" "$svc" "$code" "$url"
+        else
+          printf "  ${R}❌${N} %-25s HTTP %s  %s\n" "$svc" "$code" "$url"
+        fi
+      done
+      echo ""
+      echo -e "  ${Y}── Local Containers (udocker) ──${N}"
+      if command -v udocker &>/dev/null; then
+        local containers=$(udocker ps 2>/dev/null | tail -n +2)
+        if [ -n "$containers" ]; then
+          echo "$containers" | while read -r line; do echo "  $line"; done
+        else
+          echo -e "  ${D}No containers running${N}"
+        fi
+      else
+        echo -e "  ${Y}⚠️  udocker not installed${N}"
+        echo -e "  ${D}Install: hermes isdocker install${N}"
+      fi
+      echo ""
+      echo -e "  ${Y}── Available OS Images ──${N}"
+      echo -e "    📦 debian      — Debian Linux"
+      echo -e "    📦 ubuntu      — Ubuntu Linux"
+      echo -e "    📦 kali        — Kali Linux (pentesting)"
+      echo -e "    📦 nethunter   — Kali NetHunter (Android)"
+      echo ""
+      echo -e "  ${Y}── Available Apps ──${N}"
+      echo -e "    🤖 crewai      — CrewAI multi-agent"
+      echo -e "    📊 jupyter     — Jupyter Notebook"
+      echo -e "    💾 redis       — Redis database"
+      echo -e "    🔗 tailscale   — Tailscale VPN"
+      echo -e "    📚 calibre-web — Calibre e-book server"
+      echo -e "    🌐 httpd       — Apache HTTP server"
+      ;;
+
+    install)
+      echo -e "  ${B}Installing udocker + dependencies...${N}\n"
+      if ! command -v udocker &>/dev/null; then
+        info "Installing udocker..."
+        pip install udocker 2>/dev/null && ok "udocker installed" || {
+          # Fallback: manual install
+          mkdir -p "$HOME/.udocker/bin"
+          curl -sL "https://github.com/indigo-dc/udocker/releases/download/1.3.17/udocker-1.3.17.tar.gz" | tar xz -C "$HOME/.udocker" 2>/dev/null
+          export PATH="$HOME/.udocker/udocker:$PATH"
+          ok "udocker installed (manual)"
+        }
+      else
+        ok "udocker already installed"
+      fi
+
+      # Clone isdocker repo
+      if [ -n "$GITHUB_PAT" ] && [ ! -d "$HERMES_WORKSPACE/isdocker" ]; then
+        info "Cloning isdocker repo..."
+        git clone --depth 1 "https://x-access-token:${GITHUB_PAT}@github.com/${GH_USER}/isdocker.git" "$HERMES_WORKSPACE/isdocker" 2>/dev/null \
+          && ok "isdocker cloned to $HERMES_WORKSPACE/isdocker" \
+          || warn "Clone failed"
+      fi
+      echo ""
+      ok "Setup complete. Run: hermes isdocker run <os|app>"
+      ;;
+
+    run)
+      local target="$1"
+      [ -z "$target" ] && { err "Usage: hermes isdocker run <debian|ubuntu|kali|nethunter|crewai|jupyter|redis>"; return 1; }
+
+      if [ -d "$HERMES_WORKSPACE/isdocker" ]; then
+        local script=""
+        case "$target" in
+          debian|ubuntu|kali|nethunter) script="$HERMES_WORKSPACE/isdocker/os/$target/${target}.sh" ;;
+          crewai) script="$HERMES_WORKSPACE/isdocker/apps/crewai/crewai.sh" ;;
+          jupyter) script="$HERMES_WORKSPACE/isdocker/apps/jupyter/jupyter.sh" ;;
+          redis) script="$HERMES_WORKSPACE/isdocker/apps/redis/redis.sh" ;;
+          tailscale) script="$HERMES_WORKSPACE/isdocker/apps/tailscale/tailscale.sh" ;;
+          httpd) script="$HERMES_WORKSPACE/isdocker/apps/httpd/httpd.sh" ;;
+          *) err "Unknown target: $target"; return 1 ;;
+        esac
+
+        if [ -f "$script" ]; then
+          info "Running $target..."
+          bash "$script"
+        else
+          err "Script not found: $script"
+        fi
+      else
+        err "isdocker not cloned. Run: hermes isdocker install"
+      fi
+      ;;
+
+    ps|list)
+      if command -v udocker &>/dev/null; then
+        udocker ps 2>/dev/null || echo -e "  ${D}No containers${N}"
+      else
+        warn "udocker not installed. Run: hermes isdocker install"
+      fi
+      ;;
+
+    stop)
+      local name="$1"
+      [ -z "$name" ] && { err "Usage: hermes isdocker stop <container-name>"; return 1; }
+      udocker rm "$name" 2>/dev/null && ok "Container $name removed" || err "Failed to stop $name"
+      ;;
+
+    deploy)
+      local svc="${1:-isdocker}"
+      echo -e "  ${B}Deploy to Cloud Run: $svc${N}\n"
+      info "Project: $GCP_PROJECT | Region: $GCP_REGION"
+      echo ""
+      echo -e "  ${D}Requires gcloud CLI. Run:${N}"
+      echo -e "    gcloud run deploy $svc \\"
+      echo -e "      --source . \\"
+      echo -e "      --region $GCP_REGION \\"
+      echo -e "      --project $GCP_PROJECT \\"
+      echo -e "      --allow-unauthenticated"
+      ;;
+
+    *)
+      echo -e "  ${W}Commands:${N}"
+      echo -e "    ${BOLD}status${N}              Show Cloud Run + local containers"
+      echo -e "    ${BOLD}install${N}             Install udocker + clone repo"
+      echo -e "    ${BOLD}run${N} <os|app>        Run container (debian/ubuntu/kali/crewai/jupyter/redis)"
+      echo -e "    ${BOLD}ps${N}                  List running containers"
+      echo -e "    ${BOLD}stop${N} <name>         Stop/remove container"
+      echo -e "    ${BOLD}deploy${N} [service]    Deploy to Cloud Run"
+      ;;
+  esac
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  FIX — Auto-repair syntax errors and common issues
+# ═════════════════════════════════════════════════════════════════════════════
+cmd_fix() {
+  local target="${1:-all}"
+  header
+  echo -e "${BOLD}🔧 Hermes Fix — Auto-Repair${N}\n"
+
+  case "$target" in
+    all)
+      info "Running all fixes..."
+      echo ""
+
+      # Fix 1: Keys file permissions
+      if [ -f "$HERMES_KEYS" ]; then
+        local perms=$(stat -c %a "$HERMES_KEYS" 2>/dev/null || stat -f %Lp "$HERMES_KEYS" 2>/dev/null)
+        if [ "$perms" != "600" ]; then
+          chmod 600 "$HERMES_KEYS" 2>/dev/null
+          ok "Fixed keys file permissions → 600"
+        else
+          ok "Keys file permissions OK (600)"
+        fi
+      fi
+
+      # Fix 2: Create missing dirs
+      for d in "$HERMES_DIR" "$HERMES_WORKSPACE"; do
+        if [ ! -d "$d" ]; then
+          mkdir -p "$d"
+          ok "Created $d"
+        fi
+      done
+
+      # Fix 3: Validate JSON in keys file
+      if [ -f "$HERMES_KEYS" ]; then
+        local bad_lines=$(grep -cE '^[^#=]+=.*[^\\]"[^"]*$' "$HERMES_KEYS" 2>/dev/null || echo 0)
+        if [ "$bad_lines" -gt 0 ]; then
+          warn "Found $bad_lines potential syntax errors in keys file"
+          # Auto-fix: remove lines with unmatched quotes
+          python3 -c "
+import re
+with open('$HERMES_KEYS') as f:
+    lines = f.readlines()
+fixed = []
+for line in lines:
+    line = line.strip()
+    if not line or line.startswith('#'):
+        fixed.append(line)
+        continue
+    if '=' in line:
+        key, val = line.split('=', 1)
+        # Remove surrounding quotes if mismatched
+        val = val.strip()
+        if val.count('\"') % 2 != 0:
+            val = val.replace('\"', '')
+        if val.count(\"'\") % 2 != 0:
+            val = val.replace(\"'\", '')
+        fixed.append(f'{key}={val}')
+    else:
+        fixed.append(line)
+with open('$HERMES_KEYS', 'w') as f:
+    f.write('\n'.join(fixed) + '\n')
+" 2>/dev/null && ok "Fixed syntax errors in keys file" || warn "Could not auto-fix keys file"
+        else
+          ok "Keys file syntax OK"
+        fi
+      fi
+
+      # Fix 4: Test and repair connections
+      echo ""
+      info "Testing connections..."
+      local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$GATEWAY/health" 2>/dev/null)
+      [ "$code" = "200" ] && ok "Gateway: reachable" || warn "Gateway: HTTP $code"
+
+      if [ -n "$GROQ_KEY" ]; then
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 \
+          -H "Authorization: Bearer $GROQ_KEY" \
+          "https://api.groq.com/openai/v1/models" 2>/dev/null)
+        [ "$code" = "200" ] && ok "Groq: valid key" || warn "Groq: HTTP $code (key may be expired)"
+      fi
+
+      if [ -n "$GEMINI_KEY" ]; then
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 \
+          "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_KEY" 2>/dev/null)
+        [ "$code" = "200" ] && ok "Gemini: valid key" || warn "Gemini: HTTP $code (key may be expired)"
+      fi
+
+      # Fix 5: Update PATH
+      if [ -d "$HOME/.udocker" ] && [[ ":$PATH:" != *":$HOME/.udocker:"* ]]; then
+        echo "export PATH=\"\$HOME/.udocker:\$PATH\"" >> "$HERMES_CONFIG" 2>/dev/null
+        ok "Added udocker to PATH in config"
+      fi
+
+      echo ""
+      ok "Fix complete"
+      ;;
+
+    syntax)
+      info "Checking syntax of all scripts..."
+      local errors=0
+      for f in "$HERMES_DIR"/*.sh "$HERMES_WORKSPACE"/*/tools/*.sh; do
+        [ -f "$f" ] || continue
+        if ! bash -n "$f" 2>/dev/null; then
+          warn "Syntax error in: $f"
+          errors=$((errors+1))
+          # Try auto-fix with python
+          python3 -c "
+import re,sys
+with open(sys.argv[1]) as f: content = f.read()
+# Fix common issues
+content = content.replace('\r\n', '\n')
+content = re.sub(r'\"\"\"', '\"', content)
+content = re.sub(r\"'''\", \"'\", content)
+with open(sys.argv[1], 'w') as f: f.write(content)
+" "$f" 2>/dev/null && ok "Auto-fixed: $(basename $f)"
+        fi
+      done
+      [ "$errors" -eq 0 ] && ok "No syntax errors found"
+      ;;
+
+    keys)
+      info "Repairing keys file..."
+      if [ -f "$HERMES_KEYS" ]; then
+        chmod 600 "$HERMES_KEYS"
+        # Re-source to validate
+        source "$HERMES_KEYS" 2>/dev/null
+        ok "Keys reloaded"
+      else
+        warn "No keys file found. Run: hermes setup"
+      fi
+      ;;
+
+    *)
+      echo -e "  ${W}Commands:${N}"
+      echo -e "    ${BOLD}all${N}      Run all fixes (default)"
+      echo -e "    ${BOLD}syntax${N}   Fix syntax errors in scripts"
+      echo -e "    ${BOLD}keys${N}     Repair keys file"
+      ;;
+  esac
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  HELP
 # ═════════════════════════════════════════════════════════════════════════════
 cmd_help() {
@@ -885,6 +1307,9 @@ cmd_help() {
   echo ""
   echo -e "  ${C}System:${N}"
   echo -e "    ${BOLD}setup${N}                      Interactive API key setup"
+  echo -e "    ${BOLD}doctor${N}                     Full diagnostic (keys, endpoints, AI test)"
+  echo -e "    ${BOLD}fix${N} [all|syntax|keys]      Auto-repair syntax errors & issues"
+  echo -e "    ${BOLD}isdocker${N} [status|install|run] Container manager + Cloud Run"
   echo -e "    ${BOLD}termux${N} [info|install]      Termux system tools"
   echo -e "    ${BOLD}links${N}                      Show all URLs"
   echo -e "    ${BOLD}update${N}                     Update CLI from GitHub"
@@ -914,6 +1339,9 @@ case "${1:-help}" in
   termux)      shift; cmd_termux "$@" ;;
   links)       shift; cmd_links "$@" ;;
   update)      shift; cmd_update "$@" ;;
+  doctor)      shift; cmd_doctor "$@" ;;
+  isdocker)    shift; cmd_isdocker "$@" ;;
+  fix)         shift; cmd_fix "$@" ;;
   help|--help|-h) cmd_help ;;
   version|--version|-v) echo "Hermes v$VERSION ($CODENAME)" ;;
   *)           err "Unknown command: $1"; cmd_help ;;
