@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.2.0"
+VERSION="5.3.0"
 CODENAME="Omni"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -29,6 +29,10 @@ CF_AI="https://cf-ai.certveis.workers.dev"
 LINKS_HUB="https://rocspace-links.certveis.workers.dev"
 CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"
 ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
+
+# ─── AI Studio ───────────────────────────────────────────────────────────────
+AI_STUDIO_URL="https://aistudio.google.com/apps/c19a9112-567a-45eb-9d90-af6e02e3c2ae"
+AI_STUDIO_PROMPT_URL="https://aistudio.google.com/prompts/new_chat"
 
 # ─── Firebase ────────────────────────────────────────────────────────────────
 FIREBASE_PROJECT="planning-with-ai-36675"
@@ -1412,6 +1416,219 @@ cmd_isdocker() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  AI STUDIO — Interactive AI Studio Experience
+# ═════════════════════════════════════════════════════════════════════════════
+cmd_studio() {
+  local action="${1:-interactive}"
+  shift 2>/dev/null || true
+
+  case "$action" in
+    open|browser)
+      # Open AI Studio in browser
+      if command -v termux-open-url &>/dev/null; then
+        termux-open-url "$AI_STUDIO_URL" 2>/dev/null && ok "Opened AI Studio in browser" || warn "Failed to open"
+      elif command -v xdg-open &>/dev/null; then
+        xdg-open "$AI_STUDIO_URL" 2>/dev/null && ok "Opened AI Studio" || warn "Failed to open"
+      else
+        echo -e "  ${Y}📎${N} Open this URL manually:"
+        echo -e "    ${C}$AI_STUDIO_URL${N}"
+      fi
+      ;;
+
+    status)
+      header
+      echo -e "${BOLD}🎨 AI Studio — Project Status${N}\n"
+      echo -e "  ${Y}── Projects ──${N}"
+      
+      # Check ai-vitality
+      local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$CLOUDRUN/health" 2>/dev/null || echo "000")
+      if [ "$code" = "200" ]; then
+        printf "  ${G}✅${N} %-20s %s\n" "ai-vitality" "$CLOUDRUN"
+      else
+        printf "  ${R}❌${N} %-20s HTTP %s\n" "ai-vitality" "$code"
+      fi
+
+      # Check isdocker
+      code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$ISDOCKER" 2>/dev/null || echo "000")
+      if [ "$code" = "200" ]; then
+        printf "  ${G}✅${N} %-20s %s\n" "isdocker" "$ISDOCKER"
+      else
+        printf "  ${R}❌${N} %-20s HTTP %s\n" "isdocker" "$code"
+      fi
+
+      echo ""
+      echo -e "  ${Y}── Google AI Studio ──${N}"
+      echo -e "    ${C}$AI_STUDIO_URL${N}"
+      echo ""
+      echo -e "  ${Y}── Quick Actions ──${N}"
+      echo -e "    ${BOLD}hermes studio${N}           Interactive AI Studio"
+      echo -e "    ${BOLD}hermes studio open${N}      Open in browser"
+      echo -e "    ${BOLD}hermes studio chat${N}      Chat with Gemini"
+      ;;
+
+    chat)
+      # Direct Gemini chat (like AI Studio)
+      header
+      echo -e "${BOLD}🎨 AI Studio Chat${N} — Gemini"
+      echo -e "  ${D}Type 'exit' to quit, '/model <name>' to switch${N}\n"
+
+      local model="gemini-2.0-flash-exp"
+      local messages="[]"
+
+      while true; do
+        printf "${P}You>${N} "
+        read -r input
+        [ -z "$input" ] && continue
+        [ "$input" = "exit" ] || [ "$input" = "quit" ] && break
+
+        if [[ "$input" == /model* ]]; then
+          model="${input#/model }"
+          echo -e "  ${C}Model → $model${N}"
+          continue
+        fi
+
+        # Build Gemini request
+        messages=$(python3 -c "
+import json,sys
+msgs = json.loads(sys.argv[1])
+msgs.append({'role':'user','parts':[{'text':sys.argv[2]}]})
+print(json.dumps(msgs))
+" "$messages" "$input" 2>/dev/null || echo "$messages")
+
+        printf "${P}Gemini>${N} "
+        local resp=$(curl -s --max-time 30 -X POST \
+          "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$GEMINI_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{\"contents\":$messages,\"generationConfig\":{\"temperature\":0.7,\"maxOutputTokens\":8192}}" 2>/dev/null)
+
+        local content=$(echo "$resp" | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(d['candidates'][0]['content']['parts'][0]['text'])
+except Exception as e:
+    print('Error: ' + str(e))
+" 2>/dev/null || echo "$resp" | head -c 500)
+
+        echo "$content"
+        echo ""
+
+        # Add to history
+        messages=$(python3 -c "
+import json,sys
+msgs = json.loads(sys.argv[1])
+msgs.append({'role':'model','parts':[{'text':sys.argv[2]}]})
+print(json.dumps(msgs))
+" "$messages" "$content" 2>/dev/null || echo "$messages")
+      done
+      ;;
+
+    *)
+      # Interactive AI Studio mode
+      header
+      echo -e "${BOLD}🎨 AI Studio${N} — Interactive Mode"
+      echo -e "  ${D}Your AI projects at your fingertips${N}\n"
+      
+      echo -e "  ${Y}── Your Projects ──${N}"
+      echo -e "    ${G}1.${N} ${BOLD}ai-vitality${N}    — Multi-agent AI platform"
+      echo -e "       ${D}$CLOUDRUN${N}"
+      echo -e "    ${G}2.${N} ${BOLD}isdocker${N}       — Container manager"
+      echo -e "       ${D}$ISDOCKER${N}"
+      echo -e "    ${G}3.${N} ${BOLD}AI Studio${N}      — Google AI Studio"
+      echo -e "       ${D}$AI_STUDIO_URL${N}"
+      echo ""
+      
+      echo -e "  ${Y}── Quick Actions ──${N}"
+      echo -e "    ${C}/chat${N}            Chat with Gemini (like AI Studio)"
+      echo -e "    ${C}/open${N}            Open AI Studio in browser"
+      echo -e "    ${C}/vitality${N}        Open ai-vitality dashboard"
+      echo -e "    ${C}/docker${N}          Open isdocker"
+      echo -e "    ${C}/ask <question>${N}  Quick AI question"
+      echo -e "    ${C}/code <desc>${N}     Generate code"
+      echo -e "    ${C}/status${N}          Show project status"
+      echo -e "    ${C}/exit${N}            Exit studio"
+      echo ""
+
+      while true; do
+        printf "${P}studio>${N} "
+        read -r input
+        [ -z "$input" ] && continue
+        [ "$input" = "/exit" ] || [ "$input" = "/quit" ] && break
+
+        case "$input" in
+          /chat)
+            cmd_studio chat
+            ;;
+          /open)
+            cmd_studio open
+            ;;
+          /vitality)
+            if command -v termux-open-url &>/dev/null; then
+              termux-open-url "$CLOUDRUN/dashboard" 2>/dev/null && ok "Opened ai-vitality"
+            else
+              echo -e "  ${C}$CLOUDRUN/dashboard${N}"
+            fi
+            ;;
+          /docker)
+            if command -v termux-open-url &>/dev/null; then
+              termux-open-url "$ISDOCKER" 2>/dev/null && ok "Opened isdocker"
+            else
+              echo -e "  ${C}$ISDOCKER${N}"
+            fi
+            ;;
+          /ask*)
+            local question="${input#/ask }"
+            if [ -n "$question" ]; then
+              echo ""
+              PROVIDER=gemini MODEL=gemini-2.0-flash-exp cmd_ask "$question"
+              echo ""
+            else
+              warn "Usage: /ask <question>"
+            fi
+            ;;
+          /code*)
+            local desc="${input#/code }"
+            if [ -n "$desc" ]; then
+              echo ""
+              cmd_code "$desc"
+              echo ""
+            else
+              warn "Usage: /code <description>"
+            fi
+            ;;
+          /status)
+            cmd_studio status
+            ;;
+          1)
+            cmd_studio open
+            ;;
+          2)
+            if command -v termux-open-url &>/dev/null; then
+              termux-open-url "$ISDOCKER" 2>/dev/null && ok "Opened isdocker"
+            else
+              echo -e "  ${C}$ISDOCKER${N}"
+            fi
+            ;;
+          3)
+            if command -v termux-open-url &>/dev/null; then
+              termux-open-url "$AI_STUDIO_URL" 2>/dev/null && ok "Opened AI Studio"
+            else
+              echo -e "  ${C}$AI_STUDIO_URL${N}"
+            fi
+            ;;
+          *)
+            # Treat as a question to AI
+            echo ""
+            PROVIDER=gemini MODEL=gemini-2.0-flash-exp cmd_ask "$input"
+            echo ""
+            ;;
+        esac
+      done
+      ;;
+  esac
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  FIX — Auto-repair syntax errors and common issues
 # ═════════════════════════════════════════════════════════════════════════════
 cmd_fix() {
@@ -1560,6 +1777,7 @@ cmd_help() {
   echo -e "  ${Y}AI & Chat:${N}"
   echo -e "    ${BOLD}chat${N} [model] [provider]    Interactive AI chat"
   echo -e "    ${BOLD}coding${N}                     Interactive coding assistant (/run /debug /refactor)"
+  echo -e "    ${BOLD}studio${N} [open|chat|status]  AI Studio (projects + Gemini chat)"
   echo -e "    ${BOLD}ask${N} <question>             Quick question (non-interactive)"
   echo -e "    ${BOLD}code${N} <description>         Generate code from description"
   echo -e "    ${BOLD}crew${N} [topic]               Run CrewAI multi-agent research"
@@ -1601,6 +1819,7 @@ case "${1:-help}" in
   chat)        shift; cmd_chat "$@" ;;
   ask)         shift; cmd_ask "$@" ;;
   coding)      shift; cmd_coding "$@" ;;
+  studio)      shift; cmd_studio "$@" ;;
   code)        shift; cmd_code "$@" ;;
   crawl)       shift; cmd_crawl "$@" ;;
   crew)        shift; cmd_crew "$@" ;;
