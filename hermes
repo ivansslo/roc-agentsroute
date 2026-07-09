@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.1.0"
+VERSION="5.2.0"
 CODENAME="Omni"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -372,9 +372,282 @@ cmd_ask() {
   esac
 }
 
+# ─── Internal Ask (used by coding and other commands) ────────────────────────
+cmd_ask_internal() {
+  local question="$1"
+  local system="${2:-You are an expert programmer.}"
+  local provider="${PROVIDER:-groq}"
+  local model="${MODEL:-$(_default_model_for "$provider")}"
+  local safe_q
+  safe_q=$(json_escape "$question")
+  local safe_sys
+  safe_sys=$(json_escape "$system")
+
+  local resp=""
+  case "$provider" in
+    gemini)
+      resp=$(curl -s --max-time 30 -X POST \
+        "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$GEMINI_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"contents\":[{\"parts\":[{\"text\":$safe_q}]}],\"systemInstruction\":{\"parts\":[{\"text\":$safe_sys}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"temperature\":0.3}}")
+      echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['candidates'][0]['content']['parts'][0]['text'])" 2>/dev/null || echo "$resp" | head -c 1000
+      ;;
+    *)
+      resp=$(api_call POST "https://api.groq.com/openai/v1/chat/completions" \
+        "{\"model\":\"$model\",\"messages\":[{\"role\":\"system\",\"content\":$safe_sys},{\"role\":\"user\",\"content\":$safe_q}],\"max_tokens\":8192,\"temperature\":0.3}" \
+        "Bearer $GROQ_KEY")
+      echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])" 2>/dev/null || echo "$resp" | head -c 1000
+      ;;
+  esac
+}
+
 # ═════════════════════════════════════════════════════════════════════════════
-#  CODE GENERATION
+#  INTERACTIVE CODING ASSISTANT
 # ═════════════════════════════════════════════════════════════════════════════
+cmd_coding() {
+  header
+  echo -e "${BOLD}⌘ Coding Assistant${N} — Interactive mode"
+  echo -e "  ${D}Commands:${N}"
+  echo -e "    ${C}/run${N}           Run current code (Python/Node/Bash)"
+  echo -e "    ${C}/debug${N}         AI debug current code"
+  echo -e "    ${C}/refactor${N}      AI refactor current code"
+  echo -e "    ${C}/explain${N}       AI explain current code"
+  echo -e "    ${C}/test${N}          AI generate tests"
+  echo -e "    ${C}/fix${N}           AI fix errors in code"
+  echo -e "    ${C}/file <name>${N}   Load file into context"
+  echo -e "    ${C}/save <name>${N}   Save code to file"
+  echo -e "    ${C}/lang <lang>${N}   Set language (python/node/bash/go/rust)"
+  echo -e "    ${C}/clear${N}         Clear context"
+  echo -e "    ${C}/exit${N}          Exit coding mode"
+  echo -e "    ${D}# comment${N}      Skip line (not sent to AI)"
+  echo ""
+
+  local context=""
+  local filename=""
+  local lang="python"
+  local history="[]"
+
+  while true; do
+    if [ -n "$filename" ]; then
+      printf "${C}⌘${N} ${D}[%s]${N} ${C}>${N} " "$filename"
+    else
+      printf "${C}⌘${N} ${C}>${N} "
+    fi
+    read -r input
+    [ -z "$input" ] && continue
+    [ "$input" = "/exit" ] || [ "$input" = "/quit" ] && break
+
+    # Skip comments
+    [[ "$input" == \#* ]] && continue
+
+    # Commands
+    case "$input" in
+      /clear)
+        context=""
+        filename=""
+        history="[]"
+        echo -e "  ${G}✓${N} Context cleared"
+        continue
+        ;;
+      /lang*)
+        lang="${input#/lang }"
+        [ "$lang" = "/lang" ] && lang="python"
+        echo -e "  ${C}Language → $lang${N}"
+        continue
+        ;;
+      /file*)
+        local load_file="${input#/file }"
+        if [ -f "$load_file" ]; then
+          context=$(cat "$load_file")
+          filename="$load_file"
+          local lines=$(wc -l < "$load_file")
+          echo -e "  ${G}✓${N} Loaded: $load_file ($lines lines)"
+          # Detect language
+          case "$load_file" in
+            *.py) lang="python" ;;
+            *.js|*.ts|*.jsx|*.tsx) lang="node" ;;
+            *.sh|*.bash) lang="bash" ;;
+            *.go) lang="go" ;;
+            *.rs) lang="rust" ;;
+            *.java) lang="java" ;;
+          esac
+          echo -e "  ${D}Detected: $lang${N}"
+        else
+          echo -e "  ${R}✗${N} File not found: $load_file"
+        fi
+        continue
+        ;;
+      /save*)
+        local save_file="${input#/save }"
+        [ "$save_file" = "/save" ] && save_file="${filename:-output_$(date +%s).txt}"
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to save"
+        else
+          echo "$context" > "$save_file"
+          filename="$save_file"
+          echo -e "  ${G}✓${N} Saved to $save_file"
+        fi
+        continue
+        ;;
+      /run)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to run. Write or /file first."
+          continue
+        fi
+        echo -e "  ${Y}▶ Running ($lang)...${N}"
+        echo ""
+        case "$lang" in
+          python|py)
+            echo "$context" | python3 2>&1 | sed 's/^/    /'
+            ;;
+          node|js|javascript)
+            echo "$context" | node 2>&1 | sed 's/^/    /'
+            ;;
+          bash|sh)
+            echo "$context" | bash 2>&1 | sed 's/^/    /'
+            ;;
+          go)
+            local tmpgo="/tmp/hermes_run_$$.go"
+            echo "$context" > "$tmpgo"
+            go run "$tmpgo" 2>&1 | sed 's/^/    /'
+            rm -f "$tmpgo"
+            ;;
+          *)
+            echo -e "  ${Y}⚠${N} Cannot run $lang directly. Use /save then run manually."
+            ;;
+        esac
+        echo ""
+        continue
+        ;;
+      /debug)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to debug"
+          continue
+        fi
+        echo -e "  ${Y}🔍 Debugging...${N}"
+        echo ""
+        local debug_prompt="Debug this $lang code. Find bugs, logic errors, performance issues, and security problems. Be specific with line references:\n\n\`\`\`$lang\n$context\n\`\`\`"
+        local response=$(cmd_ask_internal "$debug_prompt" "You are a senior $lang developer and code reviewer. Be precise and actionable.")
+        echo "$response"
+        echo ""
+        continue
+        ;;
+      /refactor)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to refactor"
+          continue
+        fi
+        echo -e "  ${Y}♻️  Refactoring...${N}"
+        echo ""
+        local refactor_prompt="Refactor this $lang code for better readability, performance, and maintainability. Show the refactored code:\n\n\`\`\`$lang\n$context\n\`\`\`"
+        local response=$(cmd_ask_internal "$refactor_prompt" "You are a senior $lang developer. Output clean refactored code in a code block.")
+        echo "$response"
+        # Extract and offer to replace
+        local new_code=$(echo "$response" | python3 -c "
+import sys,re
+content = sys.stdin.read()
+blocks = re.findall(r'\`\`\`\w*\n(.*?)\`\`\`', content, re.DOTALL)
+if blocks: print(blocks[0].strip())
+" 2>/dev/null)
+        if [ -n "$new_code" ]; then
+          echo ""
+          printf "  ${D}Replace context with refactored code? [y/N]:${N} "
+          read -r confirm
+          if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            context="$new_code"
+            echo -e "  ${G}✓${N} Context updated with refactored code"
+          fi
+        fi
+        echo ""
+        continue
+        ;;
+      /explain)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to explain"
+          continue
+        fi
+        echo -e "  ${Y}📖 Explaining...${N}"
+        echo ""
+        local explain_prompt="Explain this $lang code step by step in simple terms:\n\n\`\`\`$lang\n$context\n\`\`\`"
+        cmd_ask_internal "$explain_prompt" "You are a patient coding teacher. Explain clearly for beginners."
+        echo ""
+        continue
+        ;;
+      /test)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to test"
+          continue
+        fi
+        echo -e "  ${Y}🧪 Generating tests...${N}"
+        echo ""
+        local test_prompt="Generate comprehensive unit tests for this $lang code. Include edge cases:\n\n\`\`\`$lang\n$context\n\`\`\`"
+        cmd_ask_internal "$test_prompt" "You are a QA engineer. Write thorough tests with good coverage."
+        echo ""
+        continue
+        ;;
+      /fix)
+        if [ -z "$context" ]; then
+          echo -e "  ${R}✗${N} No code to fix"
+          continue
+        fi
+        echo -e "  ${Y}🔧 Fixing...${N}"
+        echo ""
+        local fix_prompt="Fix all errors and issues in this $lang code. Show the corrected code:\n\n\`\`\`$lang\n$context\n\`\`\`"
+        local response=$(cmd_ask_internal "$fix_prompt" "You are a senior $lang developer. Fix all bugs and output corrected code in a code block.")
+        echo "$response"
+        local fixed_code=$(echo "$response" | python3 -c "
+import sys,re
+content = sys.stdin.read()
+blocks = re.findall(r'\`\`\`\w*\n(.*?)\`\`\`', content, re.DOTALL)
+if blocks: print(blocks[0].strip())
+" 2>/dev/null)
+        if [ -n "$fixed_code" ]; then
+          echo ""
+          printf "  ${D}Replace context with fixed code? [y/N]:${N} "
+          read -r confirm
+          if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            context="$fixed_code"
+            echo -e "  ${G}✓${N} Context updated with fixed code"
+          fi
+        fi
+        echo ""
+        continue
+        ;;
+    esac
+
+    # Regular input → AI coding request
+    local full_prompt="$input"
+    if [ -n "$context" ]; then
+      full_prompt="Current $lang code:\n\`\`\`$lang\n$context\n\`\`\`\n\nUser request: $input"
+    fi
+
+    local response=$(cmd_ask_internal "$full_prompt" "You are an expert $lang programmer. Provide clean, efficient code with explanations. Use markdown code blocks.")
+    
+    echo ""
+    echo "$response"
+    echo ""
+
+    # Extract code block if present
+    local extracted=$(echo "$response" | python3 -c "
+import sys,re
+content = sys.stdin.read()
+blocks = re.findall(r'\`\`\`\w*\n(.*?)\`\`\`', content, re.DOTALL)
+if blocks: print(blocks[0].strip())
+" 2>/dev/null)
+
+    if [ -n "$extracted" ] && [ -t 0 ]; then
+      printf "  ${D}Use this code as context? [y/N]:${N} "
+      read -r use_code
+      if [[ "$use_code" =~ ^[Yy]$ ]]; then
+        context="$extracted"
+        echo -e "  ${G}✓${N} Context updated"
+      fi
+    fi
+    echo ""
+  done
+}
+
+# ─── Code Generation (non-interactive) ──────────────────────────────────────
 cmd_code() {
   local prompt="$*"
   [ -z "$prompt" ] && { err "Usage: hermes code <description>"; return 1; }
@@ -1286,6 +1559,7 @@ cmd_help() {
   echo -e "${BOLD}📖 Commands${N}\n"
   echo -e "  ${Y}AI & Chat:${N}"
   echo -e "    ${BOLD}chat${N} [model] [provider]    Interactive AI chat"
+  echo -e "    ${BOLD}coding${N}                     Interactive coding assistant (/run /debug /refactor)"
   echo -e "    ${BOLD}ask${N} <question>             Quick question (non-interactive)"
   echo -e "    ${BOLD}code${N} <description>         Generate code from description"
   echo -e "    ${BOLD}crew${N} [topic]               Run CrewAI multi-agent research"
@@ -1326,6 +1600,7 @@ case "${1:-help}" in
   config)      shift; cmd_config "$@" ;;
   chat)        shift; cmd_chat "$@" ;;
   ask)         shift; cmd_ask "$@" ;;
+  coding)      shift; cmd_coding "$@" ;;
   code)        shift; cmd_code "$@" ;;
   crawl)       shift; cmd_crawl "$@" ;;
   crew)        shift; cmd_crew "$@" ;;
