@@ -1120,22 +1120,44 @@ cmd_update() {
   info "Fetching latest from GitHub..."
 
   local url="https://raw.githubusercontent.com/$GH_USER/hermes-agent-cli/main/hermes"
-  local tmp="/tmp/hermes_new"
+  local tmp="/tmp/hermes_new_$$"
 
-  curl -s -o "$tmp" "$url" 2>/dev/null
+  # Try curl with -L (follow redirects) and timeout
+  curl -sL --max-time 30 -o "$tmp" "$url" 2>/dev/null
+
+  # Fallback: try wget if curl failed
+  if [ ! -s "$tmp" ]; then
+    wget -q --timeout=30 -O "$tmp" "$url" 2>/dev/null
+  fi
+
+  # Fallback 2: try GitHub API
+  if [ ! -s "$tmp" ]; then
+    curl -sL --max-time 30 \
+      -H "Accept: application/vnd.github.v3.raw" \
+      "https://api.github.com/repos/$GH_USER/hermes-agent-cli/contents/hermes" \
+      -o "$tmp" 2>/dev/null
+  fi
+
   if [ -s "$tmp" ]; then
     local new_ver=$(grep '^VERSION=' "$tmp" | head -1 | cut -d'"' -f2)
-    info "Current: v$VERSION → Remote: v$new_ver"
+    info "Current: v$VERSION → Remote: v${new_ver:-unknown}"
 
     if [ "$new_ver" != "$VERSION" ]; then
-      cp "$tmp" "$(which hermes 2>/dev/null || echo "$PREFIX/bin/hermes")" 2>/dev/null || \
-      cp "$tmp" "$HERMES_DIR/hermes" && chmod +x "$HERMES_DIR/hermes"
-      ok "Updated to v$new_ver"
+      local target="$(which hermes 2>/dev/null || echo "$PREFIX/bin/hermes")"
+      cp "$tmp" "$target" 2>/dev/null && chmod +x "$target" && ok "Updated to v$new_ver" || {
+        # Fallback: save to HERMES_DIR
+        cp "$tmp" "$HERMES_DIR/hermes" && chmod +x "$HERMES_DIR/hermes"
+        ok "Saved to $HERMES_DIR/hermes"
+        warn "Add to PATH: export PATH=\"$HERMES_DIR:\$PATH\""
+      }
     else
-      info "Already up to date"
+      info "Already up to date (v$VERSION)"
     fi
   else
     warn "Could not fetch update"
+    echo ""
+    echo -e "  ${Y}Manual update:${N}"
+    echo -e "    ${C}curl -sL $url -o \$PREFIX/bin/hermes && chmod +x \$PREFIX/bin/hermes${N}"
   fi
   rm -f "$tmp"
 }
