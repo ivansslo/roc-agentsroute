@@ -70,12 +70,13 @@ GROQ_KEY="${GROQ_KEY:-}"
 OR_KEY="${OR_KEY:-}"
 GEMINI_KEY="${GEMINI_KEY:-}"
 CF_TOKEN="${CF_TOKEN:-}"
+CF_AI_TOKEN="${CF_AI_TOKEN:-}"
 CF_ACCOUNT="${CF_ACCOUNT:-}"
 GITHUB_PAT="${GITHUB_PAT:-}"
 MONGO_URI="${MONGO_URI:-}"
 VOYAGE_KEY="${VOYAGE_KEY:-}"
 SOLACE_URL="${SOLACE_URL:-}"
-ISDOCKER_GEMINI_KEY="${ISDOCKER_GEMINI_KEY:-}"
+ISDOCKER_GEMINI_KEY="${ISDOCKER_GEMINI_KEY:-AQ.Ab8RN6KyIzWXc3HxOVaBJIeK_kpN2ad48kuzajtAo8-E1l3rLQ}"
 MODEL="${MODEL:-}"
 PROVIDER="${PROVIDER:-groq}"
 
@@ -675,15 +676,28 @@ cmd_code() {
   local safe_system
   safe_system=$(json_escape "$system")
 
-  local resp=$(api_call POST "https://api.groq.com/openai/v1/chat/completions" \
-    "{\"model\":\"${MODEL:-llama-3.3-70b-versatile}\",\"messages\":[{\"role\":\"system\",\"content\":$safe_system},{\"role\":\"user\",\"content\":$safe_prompt}],\"max_tokens\":8192,\"temperature\":0.3}" \
-    "Bearer $GROQ_KEY")
+  local resp=""
+  if [ "$PROVIDER" = "gemini" ]; then
+    # Gemini format
+    resp=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/${MODEL:-gemini-flash-latest}:generateContent?key=$GEMINI_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"contents\":[{\"parts\":[{\"text\":$safe_prompt}]}],\"generationConfig\":{\"temperature\":0.3,\"maxOutputTokens\":8192}}")
+  else
+    # OpenAI-compatible format
+    resp=$(api_call POST "https://api.groq.com/openai/v1/chat/completions" \
+      "{\"model\":\"${MODEL:-llama-3.3-70b-versatile}\",\"messages\":[{\"role\":\"system\",\"content\":$safe_system},{\"role\":\"user\",\"content\":$safe_prompt}],\"max_tokens\":8192,\"temperature\":0.3}" \
+      "Bearer $GROQ_KEY")
+  fi
 
   local code=$(echo "$resp" | python3 -c "
 import json,sys,re
 try:
     d=json.load(sys.stdin)
-    content=d['choices'][0]['message']['content']
+    # Handle both Gemini and OpenAI formats
+    if 'candidates' in d:
+        content=d['candidates'][0]['content']['parts'][0]['text']
+    else:
+        content=d['choices'][0]['message']['content']
     # Extract code blocks
     blocks=re.findall(r'\`\`\`\w*\n(.*?)\`\`\`', content, re.DOTALL)
     if blocks:
