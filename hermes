@@ -1,14 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-
-# Colors
-BLUE="\033[0;34m"
-GREEN="\033[0;32m"
-RED="\033[0;31m"
-YELLOW="\033[1;33m"
-BOLD="\033[1m"
-DIM="\033[2m"
-N="\033[0m"
 # ║                                                                           ║
 # ║   ⚡ HERMES — Ultimate AI Agent CLI for Termux                           ║
 # ║   v5.0.0 "Omni" — Full integration from 100 repositories                ║
@@ -20,7 +11,7 @@ N="\033[0m"
 
 set -uo pipefail
 
-VERSION="5.5.0"
+VERSION="5.4.0"
 CODENAME="Omni"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -1985,225 +1976,10 @@ with open(sys.argv[1], 'w') as f: f.write(content)
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
-# SYNC - Sync all repositories to GitHub
+#  HELP
 # ═════════════════════════════════════════════════════════════════════════════
-  header
-cmd_sync() {
-  local target="${1:-all}"
-  header
-  echo -e "${BOLD}🔄 Sync Repositories to GitHub${N}\n"
-
-  # Check GitHub PAT
-  if [ -z "$GITHUB_PAT" ]; then
-    err "GITHUB_PAT not set. Run: hermes setup"
-    return 1
-  fi
-
-  # Define repositories to sync
-  declare -A REPOS=(
-    ["hermes-agent-cli"]="Hermes Agent CLI"
-    ["roadfx-ai-stack"]="RoadFX AI Stack"
-    ["ai-vitality"]="AI Vitality"
-    ["Solace-Hermes-Project"]="Solace Hermes Project"
-    ["roadfx-full-stack"]="RoadFX Full Stack"
-  )
-
-  # Function to find repository path
-  find_repo_path() {
-    local repo="$1"
-    local locations=(
-      "$HERMES_WORKSPACE/$repo"
-      "$HOME/$repo"
-      "$HOME/${repo}-main"
-      "$HOME/${repo}-master"
-      "$HOME/${repo}-push"
-    )
-    
-    for loc in "${locations[@]}"; do
-      if [ -d "$loc" ]; then
-        echo "$loc"
-        return 0
-      fi
-    done
-    return 1
-  }
-
-  case "$target" in
-    all)
-      info "Syncing all repositories..."
-      echo ""
-      
-      local success=0
-      local failed=0
-      local total=${#REPOS[@]}
-      
-      for repo in "${!REPOS[@]}"; do
-        local desc="${REPOS[$repo]}"
-        echo -e "${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-        echo -e "${BOLD}📦 $repo${N} — $desc"
-        echo -e "${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-        
-        # Find repository path
-        local repo_path=$(find_repo_path "$repo")
-        if [ -z "$repo_path" ]; then
-          warn "Repository not found locally"
-          echo -e "  ${D}Run: hermes clone $repo${N}"
-          ((failed++))
-          echo ""
-          continue
-        fi
-        
-        info "Found at: $repo_path"
-        
-        # Check if it's a git repo
-        if [ ! -d "$repo_path/.git" ]; then
-          err "Not a git repository"
-          ((failed++))
-          echo ""
-          continue
-        fi
-        
-        cd "$repo_path" || continue
-        
-        # Configure git
-        git config user.email "ivansslo@users.noreply.github.com" 2>/dev/null
-        git config user.name "ivansslo" 2>/dev/null
-        
-        # Set remote with PAT
-        git remote set-url origin "https://x-access-token:${GITHUB_PAT}@github.com/ivansslo/${repo}.git" 2>/dev/null || \
-        git remote add origin "https://x-access-token:${GITHUB_PAT}@github.com/ivansslo/${repo}.git" 2>/dev/null
-        
-        # Check for changes
-        git add -A
-        local changes=$(git status --porcelain | wc -l)
-        
-        if [ "$changes" -eq 0 ]; then
-          info "No changes to sync"
-          ((success++))
-          echo ""
-          continue
-        fi
-        
-        info "Found $changes file(s) changed"
-        
-        # Commit changes
-        local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-        git commit -m "sync: Update from hermes CLI - $timestamp" 2>&1 | head -5
-        
-        # Push to GitHub
-        info "Pushing to GitHub..."
-        local push_output=$(git push origin main 2>&1)
-        local push_status=$?
-        
-        if [ $push_status -eq 0 ]; then
-          ok "Successfully synced to GitHub"
-          echo -e "  ${G}✓${N} https://github.com/ivansslo/$repo"
-          ((success++))
-        else
-          err "Failed to push to GitHub"
-          echo "$push_output" | head -10
-          ((failed++))
-        fi
-        
-        echo ""
-      done
-      
-      # Summary
-      echo -e "${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-      echo -e "${BOLD}📊 Sync Summary${N}"
-      echo -e "${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-      echo -e "  Total:      $total repositories"
-      echo -e "  ${G}Success:    $success${N}"
-      echo -e "  ${R}Failed:     $failed${N}"
-      echo ""
-      
-      if [ $failed -eq 0 ]; then
-        ok "All repositories synced successfully!"
-      else
-        warn "$failed repository(ies) failed to sync"
-      fi
-      ;;
-    
-    list)
-      info "Repositories configured for sync:"
-      echo ""
-      for repo in "${!REPOS[@]}"; do
-        local desc="${REPOS[$repo]}"
-        local repo_path=$(find_repo_path "$repo")
-        
-        if [ -n "$repo_path" ]; then
-          echo -e "  ${G}✓${N} ${BOLD}$repo${N} — $desc"
-          echo -e "    ${D}$repo_path${N}"
-        else
-          echo -e "  ${Y}○${N} ${BOLD}$repo${N} — $desc ${D}(not cloned)${N}"
-        fi
-      done
-      echo ""
-      echo -e "  ${D}Run: hermes sync all${N}"
-      ;;
-    
-    *)
-      # Sync specific repository
-      local repo="$target"
-      local desc="${REPOS[$repo]}"
-      
-      if [ -z "$desc" ]; then
-        err "Unknown repository: $repo"
-        echo -e "  ${D}Run: hermes sync list${N}"
-        return 1
-      fi
-      
-      info "Syncing $repo..."
-      
-      # Find repository path
-      local repo_path=$(find_repo_path "$repo")
-      if [ -z "$repo_path" ]; then
-        err "Repository not found locally: $repo"
-        echo -e "  ${D}Run: hermes clone $repo${N}"
-        return 1
-      fi
-      
-      info "Found at: $repo_path"
-      
-      # Sync this specific repo (reuse the all logic)
-      cd "$repo_path" || return 1
-      
-      # Configure git
-      git config user.email "ivansslo@users.noreply.github.com" 2>/dev/null
-      git config user.name "ivansslo" 2>/dev/null
-      
-      # Set remote with PAT
-      git remote set-url origin "https://x-access-token:${GITHUB_PAT}@github.com/ivansslo/${repo}.git" 2>/dev/null || \
-      git remote add origin "https://x-access-token:${GITHUB_PAT}@github.com/ivansslo/${repo}.git" 2>/dev/null
-      
-      # Check for changes
-      git add -A
-      local changes=$(git status --porcelain | wc -l)
-      
-      if [ "$changes" -eq 0 ]; then
-        info "No changes to sync"
-        return 0
-      fi
-      
-      info "Found $changes file(s) changed"
-      
-      # Commit and push
-      local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-      git commit -m "sync: Update $repo from hermes CLI - $timestamp" 2>&1 | head -5
-      
-      info "Pushing to GitHub..."
-      if git push origin main 2>&1; then
-        ok "Successfully synced $repo to GitHub"
-        echo -e "  ${G}✓${N} https://github.com/ivansslo/$repo"
-      else
-        err "Failed to push $repo to GitHub"
-        return 1
-      fi
-      ;;
-  esac
-}
-
 cmd_help() {
+  header
   echo -e "${BOLD}📖 Commands${N}\n"
   echo -e "  ${Y}AI & Chat:${N}"
   echo -e "    ${BOLD}chat${N} [model] [provider]    Interactive AI chat"
@@ -2233,7 +2009,6 @@ cmd_help() {
   echo -e "    ${BOLD}doctor${N}                     Full diagnostic (keys, endpoints, AI test)
     ${BOLD}data${N} [status|list|save]    Cloud Run data storage"
   echo -e "    ${BOLD}fix${N} [all|syntax|keys]      Auto-repair syntax errors & issues"
-  echo -e "    ${BOLD}sync${N} [all|list|repo]       Sync repositories to GitHub"
   echo -e "    ${BOLD}isdocker${N} [status|install|run] Container manager + Cloud Run"
   echo -e "    ${BOLD}termux${N} [info|install]      Termux system tools"
   echo -e "    ${BOLD}links${N}                      Show all URLs"
@@ -2270,7 +2045,6 @@ case "${1:-help}" in
   data)        shift; cmd_data "$@" ;;
   isdocker)    shift; cmd_isdocker "$@" ;;
   fix)         shift; cmd_fix "$@" ;;
-  sync)        shift; cmd_sync "$@" ;;
   help|--help|-h) cmd_help ;;
   version|--version|-v) echo "Hermes v$VERSION ($CODENAME)" ;;
   *)           err "Unknown command: $1"; cmd_help ;;
