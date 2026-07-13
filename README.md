@@ -5,7 +5,7 @@
 ## 🚀 Quick Install (Termux)
 
 ```bash
-curl -s https://raw.githubusercontent.com/ivansslo/hermes-agent-cli/main/install.sh | bash
+curl -s https://raw.githubusercontent.com/ivansslo/roc-agentsroute/main/install.sh | bash
 ```
 
 ## 📖 Commands
@@ -148,7 +148,7 @@ Plugin files are stored in:
 
 ```bash
 pkg install curl
-curl -s https://raw.githubusercontent.com/ivansslo/hermes-agent-cli/main/install.sh | bash
+curl -s https://raw.githubusercontent.com/ivansslo/roc-agentsroute/main/install.sh | bash
 hermes setup
 hermes status
 ```
