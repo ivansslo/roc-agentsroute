@@ -1,0 +1,43 @@
+# ══════════════════════════════════════════════════
+# .gitignore — hermes-agent-cli
+# ══════════════════════════════════════════════════
+
+# ─── Secrets & Keys ──────────────────────────────
+.keys
+*.keys
+config.env
+.env
+.env.*
+!.env.example
+
+# ─── Hermes Data ─────────────────────────────────
+.hermes/
+chat_history.json
+chat_*.json
+
+# ─── Python ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+python3_venv/
+
+# ─── Node ────────────────────────────────────────
+node_modules/
+
+# ─── OS / Editor ─────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# ─── Logs ────────────────────────────────────────
+*.log
+npm-debug.log*
