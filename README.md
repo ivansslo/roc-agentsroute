@@ -1,4 +1,4 @@
-# ⚡ Hermes Agent CLI v5.7.2 "Omni"
+# ⚡ Hermes Agent CLI v5.8.0 "Omni"
 
 **Full AI Agent CLI for Termux** — integrates 100 repositories into one unified command-line tool.
 
@@ -34,10 +34,9 @@ hermes links              # Show all URLs
 hermes update             # Update CLI
 ```
 
-
 ## ⌘ Code Commands + python3_venv
 
-Hermes CLI now includes an interactive coding mode inspired by `hermes-agent` slash commands:
+Hermes CLI includes an interactive coding mode:
 
 ```bash
 hermes venv init                 # create ~/.hermes/python3_venv
@@ -57,41 +56,16 @@ Inside `hermes coding`:
 /venv init|status|pip <pkg>       manage python3_venv
 ```
 
-Set runtime options if needed:
-
-```bash
-export HERMES_CODE_WORKSPACE=$PWD
-export HERMES_AGENT_STEPS=10
-export HERMES_RUN_TIMEOUT=120
-```
-
-
-
 ## 🧠 Best AI Chat + Agent Mode
 
-Hermes Chat now defaults to `PROVIDER=best`, which selects the strongest available runtime from all configured keys:
+Hermes Chat defaults to `PROVIDER=best`, selecting the strongest available runtime:
 
-1. OpenRouter (`OR_KEY`) → `anthropic/claude-sonnet-4-5`
+1. OpenRouter (`OR_KEY`) → `openai/gpt-4o`
 2. Gemini (`GEMINI_KEY`) → `gemini-2.5-flash`
 3. Groq (`GROQ_KEY`) → `llama-3.3-70b-versatile`
 4. Hermes Gateway / Cloud Run / CF AI fallback
 
-```bash
-hermes ai-best
-hermes chat
-```
-
-Chat branding/system prompt includes:
-
-```text
-Agent Mode | Agen AI Otonom untuk Tugas Dunia Nyata
-Jalankan agen AI otonom yang menjelajahi, meneliti, membuat kode,
-dan menyelesaikan tugas dunia nyata. Bandingkan alur kerja agen dan model terdepan.
-```
-
-## 🔌 Plugin Suggestions for `/` and `#`
-
-Interactive prompts now use `prompt_toolkit` when `python3_venv` is available. Type `/` or `#` in `hermes chat`, `hermes coding`, or `hermes studio` to see command/tag suggestions.
+## 🔌 Plugin Suggestions
 
 ```bash
 hermes venv init
@@ -99,50 +73,72 @@ hermes plugins init
 hermes chat
 ```
 
-Custom suggestions:
+## 🔑 Supported Providers
 
-```bash
-hermes plugins add /deploy-check
-hermes plugins add '#security'
-hermes plugins list
-```
+- ⚡ **Groq** — Free, ultra-fast (Llama 3.3 70B, Llama 8B)
+- 🌐 **OpenRouter** — 100+ models (GPT-4o, Qwen3, DeepSeek, Gemini, Scout)
+- 💎 **Gemini** — Google AI (2.5 Flash, 2.5 Pro)
+- ☁️ **CF AI** — Cloudflare AI Factory (60 models)
+- 🔗 **Gateway** — RocSpace Gateway proxy
+- 🖥️ **Cloud Run** — GCP Cloud Run app
 
-Plugin files are stored in:
+## 🌐 Endpoints (v5.8.0 — updated to roadfx.biz.id)
 
-```text
-~/.hermes/plugins/*.commands
-```
+| Service | URL |
+|---|---|
+| Gateway (primary) | `https://ai.roadfx.biz.id` |
+| Gateway (mirror) | `https://gateway.roadfx.biz.id` |
+| Gateway (backup) | `https://api.roadfx.biz.id` |
+| Dashboard | `https://ai.roadfx.biz.id/dashboard` |
+| Chat-Live | `https://ai.roadfx.biz.id/chat-live` |
+| CF AI Factory | `https://factory.roadfx.biz.id` |
+| Links Hub | `https://app.roadfx.biz.id` |
+| Cloud Run | `https://ai-vitality-819208434965.us-west1.run.app` |
+| Oracle VM | `http://161.118.253.28` |
+| Solace | `mr-connection-mwc1f9igml1.messaging.solace.cloud` |
+| Uptime Kuma | `http://161.118.253.28:3001` |
+
+## 🤖 11 Verified AI Models
+
+| Model | Provider | Speed |
+|---|---|---|
+| llama-3.3-70b-versatile | Groq ⚡ | Fast |
+| llama-3.1-8b-instant | Groq | Fast |
+| qwen/qwen3-32b | OpenRouter | Medium (thinking) |
+| qwen/qwen3-235b-a22b | OpenRouter | Slow |
+| qwen/qwen3.6-27b | OpenRouter | Medium (thinking) |
+| openai/gpt-4o | OpenRouter | Medium |
+| openai/gpt-oss-120b | OpenRouter | Slow |
+| deepseek/deepseek-r1 | OpenRouter | Slow (thinking) |
+| meta-llama/llama-4-scout-17b-16e-instruct | OpenRouter | Medium |
+| google/gemini-2.5-flash | OpenRouter | Fast |
+| google/gemini-2.5-pro-preview | OpenRouter | Slow |
 
 ## 🏗️ Projects Integrated
 
 | Project | Description |
-|---------|-------------|
-| Solace-Hermes-Project | CF Workers Gateway (25+ endpoints) |
+|---|---|
+| [⭐ rocspace](https://github.com/ivansslo/rocspace) | **Monorepo** — Turborepo + TypeScript (Gateway, Site, Shared) |
+| roc-containers | Container manager & CLI |
 | ai-vitality | AI Studio + Firebase |
 | roadfx-full-stack | Express + Firebase Hosting |
-| roadfx-ai-stack | Worker UI (158KB) |
 | solace-crewai-cli | CrewAI multi-agent |
 | codex-master-ai-api | 15+ models API |
 | hermes-agent | Python agent framework |
 | droid-ai-toolkit | Android AI toolkit |
 | crawl4ai | Web crawler |
-| Cloud Run App | ai-vitality on GCP |
 
-## 🔑 Supported Providers
+## 🏗️ Infrastructure
 
-- ⚡ **Groq** — Free, ultra-fast (Llama 3.3 70B, Qwen3 32B, etc.)
-- 🌐 **OpenRouter** — 100+ models (GPT-4o, Claude, Gemini, DeepSeek)
-- 💎 **Gemini** — Direct Google AI (2.5 Flash/Pro)
-- ☁️ **CF AI** — Cloudflare AI Factory (60 models)
-- 🔗 **Gateway** — Hermes Gateway proxy
-- 🖥️ **Cloud Run** — GCP Cloud Run app
-
-## 🌐 Endpoints
-
-- Dashboard: `hermes-cloudflare.certveis.workers.dev/dashboard`
-- Chat: `hermes-cloudflare.certveis.workers.dev/chat`
-- Cloud Run: `ai-vitality-819208434965.us-west1.run.app`
-- Firebase: `planning-with-ai-36675.web.app`
+| Service | Provider | Region | Status |
+|---|---|---|---|
+| RocSpace Gateway v16.1.0 | Cloudflare Workers | Global | ✅ Active |
+| roc-site Router | Cloudflare Workers | Global | ✅ Active |
+| Oracle VM (roc-vm) | OCI | Singapore | ✅ Running |
+| Cloud Run (ai-vitality) | Google Cloud | us-west1 | ✅ Active |
+| Aiven PostgreSQL | Aiven | AWS Jakarta | ✅ Running |
+| Solace PubSub+ | Solace Cloud | Singapore | ✅ Connected |
+| Tailscale VPN | Tailscale | Global | ✅ Connected |
 
 ## 📱 Install on Termux
 
@@ -155,13 +151,4 @@ hermes status
 
 ---
 
-by Ivan Ssl (ivansslo) — v5.7.3 "Omni"
-
-## 🐛 Termux Chat Fix (v5.7.3)
-
-Fixed interactive chat on Termux:
-
-- `Warning: Input is not a terminal (fd=0)` — prompt_toolkit now binds to `/dev/tty` via `always_prefer_tty` and bash redirects stdin/stdout/stderr to the console.
-- Literal prompt `\033[0;32mYou>` — color variables use real ANSI (`$'...'`) so the prompt always renders as green `You>`.
-- Model API errors (bad model name / key / empty body) are printed clearly and no longer pollute chat history.
-- Broken `install.sh` heredoc for default plugins is fixed.
+by Ivan Ssl (ivansslo) — v5.8.0 "Omni"

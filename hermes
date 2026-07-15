@@ -2,7 +2,7 @@
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║                                                                           ║
 # ║   ⚡ HERMES — Ultimate AI Agent CLI for Termux                           ║
-# ║   v5.7.3 "Omni" — Termux chat TTY + model error parse fix               ║
+# ║   v5.8.0 "Omni" — Termux chat TTY + model error parse fix               ║
 # ║                                                                           ║
 # ║   by Ivan Ssl (ivansslo)                                                  ║
 # ║   Projects: Solace Hermes, RoadFX, AI-Vitality, Codex, CrewAI, ...       ║
@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.7.3"
+VERSION="5.8.0"
 CODENAME="Omni"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -22,11 +22,11 @@ HERMES_CONFIG="$HERMES_DIR/config.env"
 HERMES_WORKSPACE="$HERMES_DIR/workspace"
 
 # ─── Gateway ─────────────────────────────────────────────────────────────────
-GATEWAY="https://hermes-cloudflare.certveis.workers.dev"
-GATEWAY_MIRROR="https://hermes-webhook.certveis.workers.dev"
-GATEWAY_BACKUP="https://certve-webhook.certveis.workers.dev"
-CF_AI="https://cf-ai.certveis.workers.dev"
-LINKS_HUB="https://rocspace-links.certveis.workers.dev"
+GATEWAY="https://ai.roadfx.biz.id"
+GATEWAY_MIRROR="https://gateway.roadfx.biz.id"
+GATEWAY_BACKUP="https://api.roadfx.biz.id"
+CF_AI="https://factory.roadfx.biz.id"
+LINKS_HUB="https://app.roadfx.biz.id"
 CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"
 ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 
@@ -84,10 +84,10 @@ PROVIDER="${PROVIDER:-best}"
 # ─── Auto-select model per provider ──────────────────────────────────────────
 _default_model_for() {
   case "$1" in
-    openai|oai)   echo "gpt-4.1" ;;
-    openrouter|or) echo "anthropic/claude-sonnet-4-5" ;;
+    openai|oai)   echo "qwen/qwen3-32b" ;;
+    openrouter|or) echo "openai/gpt-4o" ;;
     # Prefer Flash as default: free-tier keys often have higher quota than Pro.
-    gemini)       echo "gemini-3.5-flash" ;;
+    gemini)       echo "gemini-2.5-flash" ;;
     groq)         echo "llama-3.3-70b-versatile" ;;
     gateway)      echo "llama-3.3-70b-versatile" ;;
     cloudrun)     echo "llama-3.3-70b-versatile" ;;
@@ -1886,7 +1886,7 @@ cmd_models() {
 
   echo ""
   echo -e "  ${M}🧠 OpenAI (Direct):${N}"
-  for m in "gpt-5" "gpt-5-mini" "gpt-4.1" "gpt-4.1-mini" "gpt-4.1-nano" "gpt-4o" "gpt-4o-mini" "o3-pro" "o3" "o3-mini" "o4-mini" "codex-mini" "gpt-4.5-preview"; do
+  for m in "gpt-5" "gpt-5-mini" "qwen/qwen3-32b" "gpt-4.1-mini" "gpt-4.1-nano" "gpt-4o" "gpt-4o-mini" "o3-pro" "o3" "o3-mini" "o4-mini" "codex-mini" "gpt-4.5-preview"; do
     printf "    %-45s" "$m"
     if [ -n "$OPENAI_KEY" ]; then
       local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
@@ -1900,14 +1900,14 @@ cmd_models() {
 
   echo ""
   echo -e "  ${B}🌐 OpenRouter:${N}"
-  for m in "google/gemini-2.5-flash" "google/gemini-2.5-pro-preview" "openai/gpt-4o" "anthropic/claude-sonnet-4-5" "deepseek/deepseek-r1"; do
+  for m in "google/gemini-2.5-flash" "google/gemini-2.5-pro-preview" "openai/gpt-4o" "openai/gpt-4o" "deepseek/deepseek-r1"; do
     printf "    %-45s" "$m"
     [ -n "$OR_KEY" ] && echo -e "${G}available${N}" || echo -e "${D}(no key)${N}"
   done
 
   echo ""
   echo -e "  ${G}💎 Gemini (Direct):${N}"
-  for m in "gemini-3.5-flash" "gemini-3.1-pro" "gemini-3-flash" "gemini-2.5-flash" "gemini-2.5-pro" "gemini-2.0-flash" "deep-research-max"; do
+  for m in "gemini-2.5-flash" "gemini-3.1-pro" "gemini-3-flash" "gemini-2.5-flash" "gemini-2.5-pro" "gemini-2.0-flash" "deep-research-max"; do
     printf "    %-45s" "$m"
     [ -n "$GEMINI_KEY" ] && echo -e "${G}available${N}" || echo -e "${D}(no key)${N}"
   done
@@ -1924,8 +1924,8 @@ cmd_status() {
   for entry in \
     "hermes-cloudflare|$GATEWAY/dashboard/status" \
     "hermes-webhook|$GATEWAY_MIRROR/" \
-    "certve-webhook|$GATEWAY_BACKUP/" \
-    "cf-ai-factory|$CF_AI/models" \
+    "openauth-certve|$GATEWAY_BACKUP/" \
+    "cf-ai|$CF_AI/models" \
     "rocspace-links|$LINKS_HUB/"; do
     local name="${entry%%|*}"
     local url="${entry##*|}"
@@ -1968,7 +1968,7 @@ cmd_deploy() {
     return 1
   fi
 
-  local workers=("hermes-cloudflare" "hermes-webhook" "certve-webhook" "cf-ai-factory" "rocspace-links")
+  local workers=("hermes-cloudflare" "hermes-webhook" "openauth-certve" "cf-ai" "rocspace-links")
   if [[ ! " ${workers[*]} " =~ " $target " ]] && [ "$target" != "all" ]; then
     err "Unknown worker: $target"
     echo -e "  Available: ${workers[*]}"
@@ -2000,7 +2000,7 @@ cmd_clone() {
     local repos=(
       "Solace-Hermes-Project:Main gateway (CF Workers)"
       "roadfx-full-stack:Full-stack platform + Firebase"
-      "roadfx-ai-stack:Backup (newest UI)"
+      "rocspace:RocSpace Monorepo (Gateway + Site + Shared)"
       "ai-vitality:AI Studio app (2 branches)"
       "roc-agentsroute:Termux CLI installer"
       "codex-master-ai-api:15+ models API"
@@ -2410,8 +2410,8 @@ cmd_doctor() {
   for entry in \
     "hermes-cloudflare|$GATEWAY/health" \
     "hermes-webhook|$GATEWAY_MIRROR/health" \
-    "certve-webhook|$GATEWAY_BACKUP/health" \
-    "cf-ai-factory|$CF_AI/models" \
+    "openauth-certve|$GATEWAY_BACKUP/health" \
+    "cf-ai|$CF_AI/models" \
     "rocspace-links|$LINKS_HUB/" \
     "ai-vitality (Cloud Run)|$CLOUDRUN/health" \
     "isdocker (Cloud Run)|$ISDOCKER"; do
@@ -2694,7 +2694,7 @@ cmd_studio() {
       echo -e "${BOLD}🎨 AI Studio Chat${N} — Gemini"
       echo -e "  ${D}Type 'exit' to quit, '/model <name>' to switch${N}\n"
 
-      local model="gemini-3.5-flash"
+      local model="gemini-2.5-flash"
       local messages="[]"
 
       while true; do
@@ -2800,7 +2800,7 @@ print(json.dumps(msgs))
             local question="${input#/ask }"
             if [ -n "$question" ]; then
               echo ""
-              PROVIDER=gemini MODEL=gemini-3.5-flash cmd_ask "$question"
+              PROVIDER=gemini MODEL=gemini-2.5-flash cmd_ask "$question"
               echo ""
             else
               warn "Usage: /ask <question>"
@@ -2839,7 +2839,7 @@ print(json.dumps(msgs))
           *)
             # Treat as a question to AI
             echo ""
-            PROVIDER=gemini MODEL=gemini-3.5-flash cmd_ask "$input"
+            PROVIDER=gemini MODEL=gemini-2.5-flash cmd_ask "$input"
             echo ""
             ;;
         esac
