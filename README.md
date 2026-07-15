@@ -1,4 +1,4 @@
-# ⚡ Hermes Agent CLI v5.8.0 "Omni"
+# ⚡ Hermes Agent CLI v5.9.0 "Unified"
 
 **Full AI Agent CLI for Termux** — integrates 100 repositories into one unified command-line tool.
 
@@ -26,7 +26,7 @@ hermes crawl <url>        # Crawl URL to markdown
 hermes firebase [action]  # Firebase Firestore operations
 hermes models             # List all AI models
 hermes status             # Full system health check
-hermes deploy [worker]    # Deploy to existing CF Workers
+hermes deploy [worker]    # Deploy to existing CF Workers (roc-site, hermes-cloudflare)
 hermes clone [repo|all]   # Clone repositories
 hermes push [dir] [msg]   # Push to GitHub
 hermes termux [action]    # Termux system tools
@@ -82,21 +82,28 @@ hermes chat
 - 🔗 **Gateway** — RocSpace Gateway proxy
 - 🖥️ **Cloud Run** — GCP Cloud Run app
 
-## 🌐 Endpoints (v5.8.0 — updated to roadfx.biz.id)
+## 🌐 Endpoints (v5.9.0 — unified router)
+
+All 14 domains route through **roc-site** unified router:
 
 | Service | URL |
 |---|---|
 | Gateway (primary) | `https://ai.roadfx.biz.id` |
 | Gateway (mirror) | `https://gateway.roadfx.biz.id` |
 | Gateway (backup) | `https://api.roadfx.biz.id` |
-| Dashboard | `https://ai.roadfx.biz.id/dashboard` |
-| Chat-Live | `https://ai.roadfx.biz.id/chat-live` |
+| Dashboard | `https://dashboard.roadfx.biz.id` |
+| Chat-Live | `https://chat.roadfx.biz.id` |
 | CF AI Factory | `https://factory.roadfx.biz.id` |
 | Links Hub | `https://app.roadfx.biz.id` |
+| Auth | `https://auth.roadfx.biz.id` |
+| Webhook | `https://webhook.roadfx.biz.id` |
+| R2 Explorer | `https://r2.roadfx.biz.id` |
+| Status | `https://status.roadfx.biz.id` |
+| CloudRun Proxy | `https://cloudrun.roadfx.biz.id` |
 | Cloud Run | `https://ai-vitality-819208434965.us-west1.run.app` |
 | Oracle VM | `http://161.118.253.28` |
-| Solace | `mr-connection-mwc1f9igml1.messaging.solace.cloud` |
 | Uptime Kuma | `http://161.118.253.28:3001` |
+| Solace | `mr-connection-mwc1f9igml1.messaging.solace.cloud` |
 
 ## 🤖 11 Verified AI Models
 
@@ -118,8 +125,8 @@ hermes chat
 
 | Project | Description |
 |---|---|
-| [⭐ rocspace](https://github.com/ivansslo/rocspace) | **Monorepo** — Turborepo + TypeScript (Gateway, Site, Shared) |
-| roc-containers | Container manager & CLI |
+| [⭐ rocspace](https://github.com/ivansslo/rocspace) | **Monorepo** — v17.0.0, Unified Router (Gateway, Site, Shared) |
+| roc-containers | Container manager & CLI v1.2.0 |
 | ai-vitality | AI Studio + Firebase |
 | roadfx-full-stack | Express + Firebase Hosting |
 | solace-crewai-cli | CrewAI multi-agent |
@@ -132,8 +139,8 @@ hermes chat
 
 | Service | Provider | Region | Status |
 |---|---|---|---|
-| RocSpace Gateway v16.1.0 | Cloudflare Workers | Global | ✅ Active |
-| roc-site Router | Cloudflare Workers | Global | ✅ Active |
+| RocSpace Gateway v17.0.0 | Cloudflare Workers | Global | ✅ Active |
+| roc-site (Unified Router) | Cloudflare Workers | Global | ✅ Active (14 domains) |
 | Oracle VM (roc-vm) | OCI | Singapore | ✅ Running |
 | Cloud Run (ai-vitality) | Google Cloud | us-west1 | ✅ Active |
 | Aiven PostgreSQL | Aiven | AWS Jakarta | ✅ Running |
@@ -151,4 +158,4 @@ hermes status
 
 ---
 
-by Ivan Ssl (ivansslo) — v5.8.0 "Omni"
+by Ivan Ssl (ivansslo) — v5.9.0 "Unified"

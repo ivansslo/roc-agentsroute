@@ -2,7 +2,7 @@
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║                                                                           ║
 # ║   ⚡ HERMES — Ultimate AI Agent CLI for Termux                           ║
-# ║   v5.8.0 "Omni" — Termux chat TTY + model error parse fix               ║
+# ║   v5.9.0 "Unified" — Termux chat TTY + model error parse fix               ║
 # ║                                                                           ║
 # ║   by Ivan Ssl (ivansslo)                                                  ║
 # ║   Projects: Solace Hermes, RoadFX, AI-Vitality, Codex, CrewAI, ...       ║
@@ -11,8 +11,8 @@
 
 set -uo pipefail
 
-VERSION="5.8.0"
-CODENAME="Omni"
+VERSION="5.9.0"
+CODENAME="Unified"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 HERMES_DIR="${HERMES_DIR:-$HOME/.hermes}"
@@ -1922,11 +1922,9 @@ cmd_status() {
 
   echo -e "  ${Y}Cloudflare Workers:${N}"
   for entry in \
-    "hermes-cloudflare|$GATEWAY/dashboard/status" \
-    "hermes-webhook|$GATEWAY_MIRROR/" \
-    "openauth-certve|$GATEWAY_BACKUP/" \
-    "cf-ai|$CF_AI/models" \
-    "rocspace-links|$LINKS_HUB/"; do
+    "roc-site|$GATEWAY/" \
+    "hermes-cloudflare|$GATEWAY/api" \
+    "cloudrun|$CLOUDRUN/"; do
     local name="${entry%%|*}"
     local url="${entry##*|}"
     local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$url" 2>/dev/null)
@@ -1958,7 +1956,7 @@ cmd_status() {
 #  DEPLOY to Cloudflare Workers
 # ═════════════════════════════════════════════════════════════════════════════
 cmd_deploy() {
-  local target="${1:-hermes-cloudflare}"
+  local target="${1:-roc-site}"
   header
   echo -e "${BOLD}🚀 Deploy to Cloudflare Workers${N}\n"
   info "Target: $target"
@@ -1968,7 +1966,7 @@ cmd_deploy() {
     return 1
   fi
 
-  local workers=("hermes-cloudflare" "hermes-webhook" "openauth-certve" "cf-ai" "rocspace-links")
+  local workers=("roc-site" "hermes-cloudflare")
   if [[ ! " ${workers[*]} " =~ " $target " ]] && [ "$target" != "all" ]; then
     err "Unknown worker: $target"
     echo -e "  Available: ${workers[*]}"
@@ -2408,13 +2406,9 @@ cmd_doctor() {
   # ── 3. Live Endpoints ──
   echo -e "  ${Y}── Live Endpoints ──${N}"
   for entry in \
-    "hermes-cloudflare|$GATEWAY/health" \
-    "hermes-webhook|$GATEWAY_MIRROR/health" \
-    "openauth-certve|$GATEWAY_BACKUP/health" \
-    "cf-ai|$CF_AI/models" \
-    "rocspace-links|$LINKS_HUB/" \
-    "ai-vitality (Cloud Run)|$CLOUDRUN/health" \
-    "isdocker (Cloud Run)|$ISDOCKER"; do
+    "roc-site (unified)|$GATEWAY/" \
+    "hermes-cloudflare|$GATEWAY/api" \
+    "ai-vitality (Cloud Run)|$CLOUDRUN/health"; do
     local name="${entry%%|*}"
     local url="${entry##*|}"
     local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$url" 2>/dev/null || echo "000")
