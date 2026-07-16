@@ -2,7 +2,7 @@
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║                                                                           ║
 # ║   ⚡ HERMES — Ultimate AI Agent CLI for Termux                           ║
-# ║   v5.11.1 "Unified" — Firebase Admin bridge + AIS-DEV endpoint update      ║
+# ║   v5.11.2 "Unified" — Firebase web config built-in (planning-with-ai-36675)║
 # ║                                                                           ║
 # ║   by Ivan Ssl (ivansslo)                                                  ║
 # ║   Projects: Solace Hermes, RoadFX, AI-Vitality, Codex, CrewAI, ...       ║
@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.11.1"
+VERSION="5.11.2"
 CODENAME="Unified"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -36,12 +36,14 @@ AI_STUDIO_URL="https://aistudio.google.com/apps/c19a9112-567a-45eb-9d90-af6e02e3
 AI_STUDIO_PROMPT_URL="https://aistudio.google.com/prompts/new_chat"
 
 # ─── Firebase ────────────────────────────────────────────────────────────────
-FIREBASE_PROJECT="${FIREBASE_PROJECT:-}"
-FIREBASE_API_KEY="${FIREBASE_API_KEY:-}"
-FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-}"
-FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET:-}"
-FIREBASE_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID:-}"
-FIREBASE_APP_ID="${FIREBASE_APP_ID:-}"
+# Built-in defaults: project planning-with-ai-36675 (web config — public by design;
+# keamanan dijaga Firebase Security Rules). Override via env atau ~/.hermes/config.env
+FIREBASE_PROJECT="${FIREBASE_PROJECT:-planning-with-ai-36675}"
+FIREBASE_API_KEY="${FIREBASE_API_KEY:-AIzaSyAPH8DG8Ji6Zjcid3s6qtnU9J8qBKGrpOQ}"
+FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-planning-with-ai-36675.firebaseapp.com}"
+FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET:-planning-with-ai-36675.firebasestorage.app}"
+FIREBASE_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID:-877262776320}"
+FIREBASE_APP_ID="${FIREBASE_APP_ID:-1:877262776320:web:44329b332a5dcddf0210e5}"
 FIREBASE_MEASUREMENT_ID="${FIREBASE_MEASUREMENT_ID:-}"
 
 # ─── GCP / Cloud Run ────────────────────────────────────────────────────────
@@ -1929,7 +1931,19 @@ cmd_firebase() {
       local resp=$(curl -s --max-time 10 "https://firestore.googleapis.com/v1/projects/$FIREBASE_PROJECT/databases/(default)/documents?pageSize=5&key=$FIREBASE_API_KEY" 2>/dev/null)
       echo "$resp" | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
+raw=sys.stdin.read()
+try:
+    d=json.loads(raw)
+except Exception:
+    print('  ❌ Firestore database tidak ditemukan / unreachable (404)')
+    print('     Buat dulu: Firebase Console → Build → Firestore Database → Create database')
+    raise SystemExit(0)
+if 'error' in d:
+    e=d['error']
+    print('  ❌ %s %s: %s' % (e.get('code'), e.get('status'), e.get('message')))
+    print('     Rules menolak akses anonim — sesuaikan Security Rules,')
+    print('     atau gunakan service account: hermes firebase admin')
+    raise SystemExit(0)
 docs=d.get('documents',[])
 if docs:
     print(f'  Found {len(docs)} documents:')
@@ -1937,7 +1951,7 @@ if docs:
         name=doc.get('name','').split('/')[-1]
         print(f'    📄 {name}')
 else:
-    print('  No documents found (or access denied)')
+    print('  No documents found')
 " 2>/dev/null || warn "Cannot reach Firestore"
       echo ""
       echo -e "  ${Y}── Quick Commands ──${N}"
@@ -1954,7 +1968,24 @@ else:
         "https://firestore.googleapis.com/v1/projects/$FIREBASE_PROJECT/databases/(default)/documents/chats?key=$FIREBASE_API_KEY" \
         -H "Content-Type: application/json" \
         -d "{\"fields\":{\"sender\":{\"stringValue\":\"hermes-cli\"},\"text\":{\"stringValue\":\"$msg\"},\"timestamp\":{\"timestampValue\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}")
-      echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin); print('  ✅ Saved:', d.get('name','unknown').split('/')[-1])" 2>/dev/null
+      echo "$resp" | python3 -c "
+import json,sys
+raw=sys.stdin.read()
+try:
+    d=json.loads(raw)
+except Exception:
+    print('  ❌ Firestore tidak bisa dijangkau (404?) — database belum dibuat?')
+    print('     Buat dulu: Firebase Console → Build → Firestore Database → Create database')
+    raise SystemExit(1)
+if 'error' in d:
+    e=d['error']
+    print('  ❌ Firestore %s: %s' % (e.get('code'), e.get('message')))
+    print('     Security Rules menolak akses anonim.')
+    print('     Opsi: longgarkan rules untuk koleksi chats, ATAU pakai service account:')
+    print('       hermes firebase admin save \"<pesan>\"')
+    raise SystemExit(1)
+print('  ✅ Saved:', d.get('name','(unknown)').split('/')[-1])
+" || true
       ;;
     deploy)
       echo -e "  ${B}Deploying to Firebase Hosting...${N}\n"
