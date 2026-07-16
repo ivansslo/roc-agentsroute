@@ -2,7 +2,7 @@
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║                                                                           ║
 # ║   ⚡ HERMES — Ultimate AI Agent CLI for Termux                           ║
-# ║   v5.11.0 "Unified" — orchestrator dispatch + AIS provider + dedupe fix    ║
+# ║   v5.11.1 "Unified" — Firebase Admin bridge + AIS-DEV endpoint update      ║
 # ║                                                                           ║
 # ║   by Ivan Ssl (ivansslo)                                                  ║
 # ║   Projects: Solace Hermes, RoadFX, AI-Vitality, Codex, CrewAI, ...       ║
@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.11.0"
+VERSION="5.11.1"
 CODENAME="Unified"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -28,8 +28,7 @@ GATEWAY_BACKUP="https://api.roadfx.biz.id"
 CF_AI="https://factory.roadfx.biz.id"
 LINKS_HUB="https://app.roadfx.biz.id"
 CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"  # LEGACY (billing down)
-AIS_DEV="https://ais-dev-4kbznhxyc5wsr5c6oxw6zz-70765440683.asia-east1.run.app"  # Google AI Studio Applet (fast + high thinking)
-AIS_KEY="https://ais-dev-4kbznhxyc5wsr5c6oxw6zz-70765440683.asia-east1.run.app"  # Legacy alias kept for config compat
+AIS_DEV="https://ais-dev-jqizmthqeu2hdc4e3pgh63-70765440683.asia-east1.run.app"  # Google AI Studio Applet (fast + high thinking, updated 2026-07-16)
 ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 
 # ─── AI Studio ───────────────────────────────────────────────────────────────
@@ -1814,12 +1813,110 @@ else:
 # ═════════════════════════════════════════════════════════════════════════════
 #  FIREBASE
 # ═════════════════════════════════════════════════════════════════════════════
+# ─── Firebase Admin SDK (self-serve service account) ─────────────────────
+# Key lookup order:
+#   $FIREBASE_SERVICE_ACCOUNT → ~/.hermes/serviceAccountKey.json
+#   → <hermes_dir>/assets/serviceAccountKey.json → ADC ($GOOGLE_APPLICATION_CREDENTIALS)
+cmd_firebase_admin() {
+  local action="${1:-status}"
+  [ $# -gt 0 ] && shift
+
+  local sa="${FIREBASE_SERVICE_ACCOUNT:-}"
+  [ -z "$sa" ] && [ -f "$HERMES_DIR/serviceAccountKey.json" ] && sa="$HERMES_DIR/serviceAccountKey.json"
+  if [ -z "$sa" ]; then
+    local cli_dir
+    cli_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+    [ -f "$cli_dir/assets/serviceAccountKey.json" ] && sa="$cli_dir/assets/serviceAccountKey.json"
+  fi
+
+  FIREBASE_SA_PATH="$sa" "$(_hermes_python)" - "$action" "$@" <<'FIREBASE_ADMIN_PY'
+import json, os, sys, datetime
+
+sa  = os.environ.get("FIREBASE_SA_PATH", "").strip()
+adc = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+args   = sys.argv[1:]
+action = args[0] if args else "status"
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, firestore
+except ImportError:
+    print("ERROR: modul 'firebase_admin' belum terpasang.")
+    print("Fix:")
+    print("  hermes venv init                  (siapkan venv Hermes)")
+    print("  hermes venv pip firebase-admin    (install SDK ke venv)")
+    print("  # Termux bila build grpcio gagal: pkg install python-grpcio -y")
+    sys.exit(2)
+
+if not firebase_admin._apps:
+    if sa and os.path.isfile(sa):
+        cred = credentials.Certificate(sa)
+    elif adc:
+        cred = credentials.ApplicationDefault()
+    else:
+        home = os.environ.get("HOME", "~")
+        print("ERROR: serviceAccountKey.json tidak ditemukan.")
+        print("Self-serve:")
+        print("  1. Firebase Console -> Project Settings -> Service accounts")
+        print("     -> klik 'Generate new private key'")
+        print("  2. Simpan key ke salah satu lokasi:")
+        print(f"       {home}/.hermes/serviceAccountKey.json")
+        print("       assets/serviceAccountKey.json  (di repo, sudah di-gitignore)")
+        print("     atau: export FIREBASE_SERVICE_ACCOUNT=/path/key.json")
+        print("  3. Ulangi: hermes firebase admin status")
+        sys.exit(3)
+    firebase_admin.initialize_app(cred)
+
+db  = firestore.client()
+app = firebase_admin.get_app()
+
+if action == "status":
+    print("project   :", app.project_id)
+    print("credential:", ("service-account " + sa) if sa else "Application Default (ADC)")
+    cols = list(db.collections())
+    print("collections:", len(cols))
+    for c in cols:
+        n = sum(1 for _ in c.limit(50).stream())
+        print(f"  - {c.id} ({n} docs, maks 50 ditampilkan)")
+
+elif action == "list":
+    col   = args[1] if len(args) > 1 else "chats"
+    limit = int(args[2]) if len(args) > 2 else 10
+    n = 0
+    for d in db.collection(col).limit(limit).stream():
+        n += 1
+        print(f"{d.id}: {json.dumps(d.to_dict(), ensure_ascii=False)[:200]}")
+    if n == 0:
+        print(f"(kosong atau tidak ada akses: {col})")
+
+elif action == "save":
+    msg = " ".join(args[1:]).strip()
+    if not msg:
+        print("Usage: hermes firebase admin save <message>")
+        sys.exit(1)
+    col = os.environ.get("FIREBASE_COLLECTION", "chats")
+    _, ref = db.collection(col).add({
+        "sender": "hermes-cli",
+        "text": msg,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc),
+    })
+    print("saved:", ref.id, f"(collection: {col})")
+
+else:
+    print("Admin commands: status | list [collection] [limit] | save <message>")
+FIREBASE_ADMIN_PY
+}
+
 cmd_firebase() {
   local action="${1:-status}"
   header
   echo -e "${BOLD}🔥 Firebase — ${FIREBASE_PROJECT}${N}\n"
 
   case "$action" in
+    admin)
+      shift
+      cmd_firebase_admin "$@"
+      ;;
     status)
       echo -e "  ${Y}── Project Info ──${N}"
       echo -e "    Project ID:      ${C}${FIREBASE_PROJECT}${N}"
@@ -1844,7 +1941,8 @@ else:
 " 2>/dev/null || warn "Cannot reach Firestore"
       echo ""
       echo -e "  ${Y}── Quick Commands ──${N}"
-      echo -e "    ${BOLD}hermes firebase save <msg>${N}    Save to Firestore"
+      echo -e "    ${BOLD}hermes firebase save <msg>${N}    Save to Firestore (REST)"
+      echo -e "    ${BOLD}hermes firebase admin${N}         Admin SDK (service account)"
       echo -e "    ${BOLD}hermes firebase deploy${N}        Deploy to Hosting"
       echo -e "    ${BOLD}hermes firebase config${N}        Show web config"
       ;;
@@ -1883,7 +1981,7 @@ const firebaseConfig = {
 EOF
       ;;
     *)
-      echo -e "  ${W}Commands:${N} status, save <message>, deploy, config"
+      echo -e "  ${W}Commands:${N} status, admin [status|list|save], save <message>, deploy, config"
       ;;
   esac
 }
@@ -3131,7 +3229,7 @@ cmd_help() {
   echo ""
   echo -e "  ${B}Web & Data:${N}"
   echo -e "    ${BOLD}crawl${N} <url>                Crawl URL to markdown"
-  echo -e "    ${BOLD}firebase${N} [status|save]     Firebase Firestore operations"
+  echo -e "    ${BOLD}firebase${N} [status|save|admin] Firebase Firestore (REST atau Admin SDK)"
   echo ""
   echo -e "  ${G}Models & Status:${N}"
   echo -e "    ${BOLD}models${N}                     List all available AI models"

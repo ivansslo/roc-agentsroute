@@ -1,8 +1,8 @@
-# ⚡ Hermes Agent CLI v5.11.0 "Unified"
+# ⚡ Hermes Agent CLI v5.11.1 "Unified"
 
 **Full AI Agent CLI for Termux** — integrates 100 repositories into one unified command-line tool.
 
-> **v5.11.0** — repair release: fixes the v5.10.x double-patch damage (see [Changelog](#-changelog)).
+> **v5.11.1** — Firebase Admin SDK (self-serve) + new AIS-DEV endpoint. **v5.11.0** fixed the v5.10.x double-patch damage (see [Changelog](#-changelog)).
 
 ## 🚀 Quick Install (Termux)
 
@@ -90,6 +90,26 @@ hermes chat
 - 🔗 **Gateway** — RocSpace Gateway proxy
 - 🖥️ **Cloud Run** — GCP Cloud Run app (legacy)
 
+## 🔥 Firebase Admin SDK (self-serve service account)
+
+```bash
+# 1. Firebase Console ⚙ Project Settings → Service accounts
+#      → klik "Generate new private key"
+# 2. Simpan key ke salah satu lokasi:
+#      ~/.hermes/serviceAccountKey.json     # Termux
+#      assets/serviceAccountKey.json       # repo ini (sudah di-gitignore)
+#    atau: export FIREBASE_SERVICE_ACCOUNT=/path/key.json
+# 3. Install SDK:
+hermes venv init && hermes venv pip firebase-admin
+#    (Termux bila build grpcio gagal: pkg install python-grpcio -y)
+
+hermes firebase admin status          # project info + daftar collections
+hermes firebase admin list chats 10   # list dokumen Firestore
+hermes firebase admin save "halo"     # simpan dokumen (default koleksi: chats)
+```
+
+File kunci **tidak pernah ikut di-push** — `serviceAccountKey.json` sudah masuk `.gitignore`.
+
 ## 🌐 Endpoints (v5.9.0 — unified router)
 
 All 14 domains route through **roc-site** unified router:
@@ -108,7 +128,7 @@ All 14 domains route through **roc-site** unified router:
 | R2 Explorer | `https://r2.roadfx.biz.id` |
 | Status | `https://status.roadfx.biz.id` |
 | CloudRun Proxy | `https://cloudrun.roadfx.biz.id` |
-| AIS-DEV (AI Studio applet) | `https://ais-dev-4kbznhxyc5wsr5c6oxw6zz-70765440683.asia-east1.run.app` ⚠️ *offline — check needed* |
+| AIS-DEV (AI Studio applet) | `https://ais-dev-jqizmthqeu2hdc4e3pgh63-70765440683.asia-east1.run.app` ✅ *live (updated 2026-07-16)* |
 | Cloud Run (legacy) | `https://ai-vitality-819208434965.us-west1.run.app` ⚠️ *down (billing)* |
 | Oracle VM | `http://161.118.253.28` |
 | Uptime Kuma | `http://161.118.253.28:3001` |
@@ -152,7 +172,7 @@ All 14 domains route through **roc-site** unified router:
 | roc-site (Unified Router) | Cloudflare Workers | Global | ✅ Active (14 domains) |
 | Oracle VM (roc-vm) | OCI | Singapore | ✅ Running |
 | Cloud Run (ai-vitality) | Google Cloud | us-west1 | ⚠️ Offline (billing) |
-| AIS-DEV | Google Cloud Run | asia-east1 | ⚠️ Offline — verify deployment |
+| AIS-DEV | Google Cloud Run | asia-east1 | ✅ Active |
 | Aiven PostgreSQL | Aiven | AWS Jakarta | ✅ Running |
 | Solace PubSub+ | Solace Cloud | Singapore | ✅ Connected |
 | Tailscale VPN | Tailscale | Global | ✅ Connected |
@@ -168,9 +188,20 @@ hermes status
 
 ---
 
-by Ivan Ssl (ivansslo) — v5.11.0 "Unified"
+by Ivan Ssl (ivansslo) — v5.11.1 "Unified"
 
 ## 🆕 Changelog
+
+### v5.11.1 — Firebase Admin + AIS-DEV endpoint (2026-07-16)
+
+- **Firebase Admin SDK bridge** (`hermes firebase admin`): koneksi Firestore
+  via service account — *self-serve* key (`~/.hermes/serviceAccountKey.json`,
+  `assets/serviceAccountKey.json`, atau env `FIREBASE_SERVICE_ACCOUNT` /
+  ADC). Commands: `status`, `list [collection] [limit]`, `save <message>`.
+  Tertanam di file `hermes` tunggal agar jalan juga di instalasi Termux.
+- **AIS-DEV endpoint updated** ke deployment baru
+  (`ais-dev-jqizmthqeu2hdc4e3pgh63…asia-east1.run.app`, live ✅) — yang lama 404.
+- `.gitignore`: `serviceAccountKey.json` ikut terproteksi.
 
 ### v5.11.0 — Repair Release (2026-07-16)
 

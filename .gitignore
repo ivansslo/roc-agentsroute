@@ -46,6 +46,7 @@ npm-debug.log*
 assets/GoogleService-Info.plist
 GoogleService-Info.plist
 google-services.json
+serviceAccountKey.json
 
 # ─── Backups / Patch artifacts ───────────────────
 *.bak
