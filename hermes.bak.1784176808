@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.10.0"
+VERSION="5.9.0"
 CODENAME="Unified"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -107,7 +107,6 @@ _provider_ready() {
     groq)          [ -n "$GROQ_KEY" ] ;;
     gateway)       [ -n "$TOKEN" ] ;;
     cloudrun)      [ -n "$TOKEN" ] ;;
-    ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;  # same TOKEN as gateway
     ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;
     ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;
     cf|cfai)       [ -n "$TOKEN" ] || [ -n "$CF_AI_TOKEN" ] ;;
@@ -315,7 +314,6 @@ cmd_config() {
   echo -e "  ${W}CF AI:${N}       $CF_AI"
   echo -e "  ${W}Links Hub:${N}   $LINKS_HUB"
   echo -e "  ${W}Cloud Run:${N}   $CLOUDRUN"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${W}Firebase:${N}    $FIREBASE_PROJECT"
   echo -e "  ${W}AI Studio:${N}  $AI_STUDIO_URL"
@@ -1946,7 +1944,6 @@ cmd_status() {
 
   echo ""
   echo -e "  ${B}Cloud Run:${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$CLOUDRUN/health" 2>/dev/null)
   [ "$code" = "200" ] && printf "    ${G}✅${N} %-25s HTTP %s\n" "ai-vitality" "$code" || printf "    ${R}❌${N} %-25s HTTP %s\n" "ai-vitality" "$code"
 
@@ -2176,7 +2173,6 @@ cmd_links() {
   echo -e "    Links Hub:   $LINKS_HUB"
   echo ""
   echo -e "  ${B}Cloud Run:${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "    ai-vitality: $CLOUDRUN/dashboard"
   echo -e "    Chat:        $CLOUDRUN/chat-live"
   echo -e "    API:         $CLOUDRUN/api"
@@ -2511,7 +2507,6 @@ cmd_isdocker() {
   header
   echo -e "${BOLD}🐳 isdocker — Container Manager${N}"
   echo -e "  ${D}Cloud Run: $ISDOCKER${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${D}GCP Project: $GCP_PROJECT | Region: $GCP_REGION${N}\n"
 
   case "$action" in
@@ -2625,7 +2620,6 @@ cmd_isdocker() {
     deploy)
       local svc="${1:-isdocker}"
       echo -e "  ${B}Deploy to Cloud Run: $svc${N}\n"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
       info "Project: $GCP_PROJECT | Region: $GCP_REGION"
       echo ""
       echo -e "  ${D}Requires gcloud CLI. Run:${N}"
@@ -2695,8 +2689,6 @@ cmd_studio() {
       echo ""
       echo -e "  ${Y}── Quick Actions ──${N}"
       echo -e "    ${BOLD}hermes studio${N}           Interactive AI Studio"
-  echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (coding + grounding)"
-  echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
       echo -e "    ${BOLD}hermes studio open${N}      Open in browser"
       echo -e "    ${BOLD}hermes studio chat${N}      Chat with Gemini"
       ;;
@@ -3108,8 +3100,6 @@ cmd_help() {
   echo -e "    ${BOLD}plugins${N} [init|list|add]     Command suggestions for / and # in chat"
   echo -e "    ${BOLD}ai-best${N}                    Show selected best AI from available keys"
   echo -e "    ${BOLD}studio${N} [open|chat|status]  AI Studio (projects + Gemini chat)"
-  echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (coding + grounding)"
-  echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
   echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (Planner→Researcher→Coder→...)"
   echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
   echo -e "    ${BOLD}ask${N} <question>             Quick question (non-interactive)"
@@ -3149,8 +3139,6 @@ cmd_help() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 case "${1:-help}" in
-  orchestrator) shift; cmd_orchestrator "$@" ;;
-  import|ais-import) shift; cmd_import_to_aistudio "$@" ;;
   orchestrator)  shift; cmd_orchestrator "$@" ;;
   import|ais-import) shift; cmd_import_to_aistudio "$@" ;;
   setup)       shift; cmd_setup "$@" ;;
@@ -3294,118 +3282,4 @@ cmd_import_to_aistudio() {
   echo -e "    3. Or run: hermes studio chat (uses Gemini directly)"
   echo ""
   ok "Agent definition ready for import"
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  AUTONOMOUS ORCHESTRATOR (High Thinking + Coding + Grounding + Fast Response)
-# ═════════════════════════════════════════════════════════════════════════════
-cmd_orchestrator() {
-  local task="$*"
-  [ -z "$task" ] && { err "Usage: hermes orchestrator <complex task>"; return 1; }
-
-  header
-  echo -e "${BOLD}🧠 Autonomous Orchestrator${N} — High Thinking + Grounding"
-  echo -e "  Task: ${C}$task${N}"
-  echo -e "  Flow: Planner → Researcher → Coder → Reviewer → Tester + Grounding"
-  echo -e "  Supports: coding, fast response, high thinking, real-world tasks\n"
-
-  local workdir="${HERMES_CODE_WORKSPACE:-$(pwd)}"
-  local steps=6
-  local last=""
-
-  for step in $(seq 1 $steps); do
-    echo -e "${Y}── Step $step/$steps ──${N}"
-
-    local prompt="You are Hermes Autonomous Orchestrator (high-thinking, coding, grounding).
-Task: $task
-Step: $step/$steps
-Previous: $last
-
-Return ONLY compact JSON:
-{
-  \"thought\": \"grounded reasoning\",
-  \"role\": \"planner|researcher|coder|reviewer|tester\",
-  \"action\": \"shell|read|write|search|done\",
-  \"command\": \"...\",
-  \"path\": \"...\",
-  \"content\": \"...\",
-  \"grounding\": \"source/logic\",
-  \"message\": \"summary\"
-}"
-
-    local resp=$(cmd_ask_internal "$prompt" "Output ONLY valid JSON.")
-    local json=$(printf "%s" "$resp" | _extract_json_object 2>/dev/null)
-
-    if [ -z "$json" ]; then
-      warn "Bad JSON from model"
-      last="model returned invalid JSON"
-      continue
-    fi
-
-    local role=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("role",""))' "$json" 2>/dev/null)
-    local action=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("action",""))' "$json" 2>/dev/null)
-    local thought=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("thought",""))' "$json" 2>/dev/null)
-
-    echo -e "  ${C}[$role]${N} $thought"
-
-    case "$action" in
-      shell)
-        local cmd=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("command",""))' "$json" 2>/dev/null)
-        echo -e "  ${BOLD}$ $cmd${N}"
-        local out=$(cd "$workdir" && timeout 90 bash -lc "$cmd" 2>&1 | head -60)
-        printf "    %s\n" "$out"
-        last="shell: $cmd"
-        ;;
-      write)
-        local p=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("path",""))' "$json" 2>/dev/null)
-        local c=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("content",""))' "$json" 2>/dev/null)
-        mkdir -p "$(dirname "$workdir/$p")"
-        echo "$c" > "$workdir/$p"
-        ok "Wrote $p"
-        last="wrote:$p"
-        ;;
-      done)
-        local msg=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("message","Complete"))' "$json" 2>/dev/null)
-        ok "$msg"
-        return 0
-        ;;
-      *)
-        echo -e "  ${D}$action${N}"
-        last="$action"
-        ;;
-    esac
-    echo ""
-  done
-  warn "Max steps reached"
-}
-
-cmd_import_to_aistudio() {
-  local task="${*:-Autonomous Hermes Orchestrator}"
-  header
-  echo -e "${BOLD}📥 Auto Export for Google AI Studio / AIS-DEV${N}\n"
-
-  cat << JSON
-{
-  "name": "Hermes Autonomous Orchestrator",
-  "source": "roc-agentsroute v5.9.0 (patched)",
-  "task": "$task",
-  "modes": ["autonomous", "orchestrator", "coding", "fast-response", "high-thinking", "grounding"],
-  "providers": ["ais", "gateway", "gemini", "groq", "openrouter"],
-  "loop": "Planner → Researcher → Coder → Reviewer → Tester + Grounding",
-  "endpoints": {
-    "ais_dev": "$AIS_DEV",
-    "gateway": "$GATEWAY"
-  },
-  "recommended_model": "gemini-2.5-flash (fast + high thinking)"
-}
-JSON
-
-  echo ""
-  echo -e "${C}How to import:${N}"
-  echo "  1. Open $AIS_DEV or aistudio.google.com"
-  echo "  2. New prompt / custom agent"
-  echo "  3. Paste the JSON as system instructions"
-  echo "  4. Or run: hermes studio chat"
-  echo ""
-  ok "Agent definition ready for AI Studio / AIS-DEV"
 }

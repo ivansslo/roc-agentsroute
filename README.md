@@ -159,3 +159,11 @@ hermes status
 ---
 
 by Ivan Ssl (ivansslo) — v5.9.0 "Unified"
+
+## 🆕 v5.10.0 — Orchestrator + Modern UI
+
+- Added `orchestrator` command (full autonomous loop)
+- Added `import` / `ais-import` (auto-export for AI Studio)
+- New UI templates integrated (orchestrator-live.html)
+- AIS_DEV first-class + gemini-2.5-flash
+

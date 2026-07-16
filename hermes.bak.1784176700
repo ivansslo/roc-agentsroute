@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-VERSION="5.10.0"
+VERSION="5.9.0"
 CODENAME="Unified"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -27,9 +27,7 @@ GATEWAY_MIRROR="https://gateway.roadfx.biz.id"
 GATEWAY_BACKUP="https://api.roadfx.biz.id"
 CF_AI="https://factory.roadfx.biz.id"
 LINKS_HUB="https://app.roadfx.biz.id"
-CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"  # LEGACY (billing down)
-AIS_DEV="https://ais-dev-4kbznhxyc5wsr5c6oxw6zz-70765440683.asia-east1.run.app"  # NEW Google AI Studio Applet (fast + high thinking)
-AIS_DEV="https://ais-dev-4kbznhxyc5wsr5c6oxw6zz-70765440683.asia-east1.run.app"  # NEW Google AI Studio Applet / fallback (fast + high thinking)
+CLOUDRUN="https://ai-vitality-819208434965.us-west1.run.app"
 ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 
 # ─── AI Studio ───────────────────────────────────────────────────────────────
@@ -92,7 +90,7 @@ _default_model_for() {
     gemini)       echo "gemini-2.5-flash" ;;
     groq)         echo "llama-3.3-70b-versatile" ;;
     gateway)      echo "llama-3.3-70b-versatile" ;;
-    ais|aisdev|newcr|ais-dev) echo "gemini-2.5-flash" ;;  # AIS-DEV: fast + high-thinking (Google AI Studio)
+    cloudrun)     echo "llama-3.3-70b-versatile" ;;
     cf|cfai)      echo "@cf/meta/llama-3.3-70b-instruct-fp8-fast" ;;
     best|auto|all) echo "auto" ;;
     *)            echo "llama-3.3-70b-versatile" ;;
@@ -107,16 +105,13 @@ _provider_ready() {
     groq)          [ -n "$GROQ_KEY" ] ;;
     gateway)       [ -n "$TOKEN" ] ;;
     cloudrun)      [ -n "$TOKEN" ] ;;
-    ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;  # same TOKEN as gateway
-    ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;
-    ais|aisdev|newcr|ais-dev) [ -n "$TOKEN" ] ;;
     cf|cfai)       [ -n "$TOKEN" ] || [ -n "$CF_AI_TOKEN" ] ;;
     *)             return 1 ;;
   esac
 }
 
 _best_ai_runtime() {
-  # Ranking: Groq (fast) → AIS_DEV (thinking) → OpenRouter (smart) → Gemini → Gateway → ...
+  # Ranking: Groq (free/fast) → OpenAI → OpenRouter → Gemini → Gateway → CloudRun → CF
   # Override with PROVIDER=<name> MODEL=<model> when a specific runtime is desired.
   if _provider_ready groq; then
     echo "groq|$(_default_model_for groq)"; return
@@ -131,9 +126,6 @@ _best_ai_runtime() {
     echo "gemini|$(_default_model_for gemini)"; return
   fi
   if _provider_ready gateway; then
-  if _provider_ready ais; then
-    echo "ais|gemini-2.5-flash"; return
-  fi
     echo "gateway|$(_default_model_for gateway)"; return
   fi
   if _provider_ready cloudrun; then
@@ -315,8 +307,6 @@ cmd_config() {
   echo -e "  ${W}CF AI:${N}       $CF_AI"
   echo -e "  ${W}Links Hub:${N}   $LINKS_HUB"
   echo -e "  ${W}Cloud Run:${N}   $CLOUDRUN"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${W}Firebase:${N}    $FIREBASE_PROJECT"
   echo -e "  ${W}AI Studio:${N}  $AI_STUDIO_URL"
   echo ""
@@ -1881,9 +1871,6 @@ cmd_models() {
   echo -e "${BOLD}📦 Available Models${N}\n"
 
   echo -e "  ${Y}⚡ Groq (Free, Ultra-Fast):${N}"
-  echo -e "  ${G}🧠 AIS-DEV / Gemini (High Thinking + Fast):${N}"
-  echo -e "    gemini-2.5-flash          (recommended for coding + thinking)"
-  echo -e "    gemini-2.5-pro-preview"
   for m in "llama-3.3-70b-versatile" "qwen/qwen3-32b" "qwen/qwen3.6-27b" "meta-llama/llama-4-scout-17b-16e-instruct" "openai/gpt-oss-120b" "groq/compound" "llama-3.1-8b-instant"; do
     printf "    %-45s" "$m"
     if [ -n "$GROQ_KEY" ]; then
@@ -1946,7 +1933,6 @@ cmd_status() {
 
   echo ""
   echo -e "  ${B}Cloud Run:${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   local code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "$CLOUDRUN/health" 2>/dev/null)
   [ "$code" = "200" ] && printf "    ${G}✅${N} %-25s HTTP %s\n" "ai-vitality" "$code" || printf "    ${R}❌${N} %-25s HTTP %s\n" "ai-vitality" "$code"
 
@@ -2176,7 +2162,6 @@ cmd_links() {
   echo -e "    Links Hub:   $LINKS_HUB"
   echo ""
   echo -e "  ${B}Cloud Run:${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "    ai-vitality: $CLOUDRUN/dashboard"
   echo -e "    Chat:        $CLOUDRUN/chat-live"
   echo -e "    API:         $CLOUDRUN/api"
@@ -2511,7 +2496,6 @@ cmd_isdocker() {
   header
   echo -e "${BOLD}🐳 isdocker — Container Manager${N}"
   echo -e "  ${D}Cloud Run: $ISDOCKER${N}"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${D}GCP Project: $GCP_PROJECT | Region: $GCP_REGION${N}\n"
 
   case "$action" in
@@ -2625,7 +2609,6 @@ cmd_isdocker() {
     deploy)
       local svc="${1:-isdocker}"
       echo -e "  ${B}Deploy to Cloud Run: $svc${N}\n"
-  echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
       info "Project: $GCP_PROJECT | Region: $GCP_REGION"
       echo ""
       echo -e "  ${D}Requires gcloud CLI. Run:${N}"
@@ -2695,8 +2678,6 @@ cmd_studio() {
       echo ""
       echo -e "  ${Y}── Quick Actions ──${N}"
       echo -e "    ${BOLD}hermes studio${N}           Interactive AI Studio"
-  echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (coding + grounding)"
-  echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
       echo -e "    ${BOLD}hermes studio open${N}      Open in browser"
       echo -e "    ${BOLD}hermes studio chat${N}      Chat with Gemini"
       ;;
@@ -3108,10 +3089,6 @@ cmd_help() {
   echo -e "    ${BOLD}plugins${N} [init|list|add]     Command suggestions for / and # in chat"
   echo -e "    ${BOLD}ai-best${N}                    Show selected best AI from available keys"
   echo -e "    ${BOLD}studio${N} [open|chat|status]  AI Studio (projects + Gemini chat)"
-  echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (coding + grounding)"
-  echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
-  echo -e "    ${BOLD}orchestrator${N} <task>       Autonomous high-thinking orchestrator (Planner→Researcher→Coder→...)"
-  echo -e "    ${BOLD}import|ais-import${N}         Export agent for AI Studio / AIS-DEV"
   echo -e "    ${BOLD}ask${N} <question>             Quick question (non-interactive)"
   echo -e "    ${BOLD}code${N} <description>         Generate code from description"
   echo -e "    ${BOLD}crew${N} [topic]               Run CrewAI multi-agent research"
@@ -3149,10 +3126,6 @@ cmd_help() {
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 case "${1:-help}" in
-  orchestrator) shift; cmd_orchestrator "$@" ;;
-  import|ais-import) shift; cmd_import_to_aistudio "$@" ;;
-  orchestrator)  shift; cmd_orchestrator "$@" ;;
-  import|ais-import) shift; cmd_import_to_aistudio "$@" ;;
   setup)       shift; cmd_setup "$@" ;;
   config)      shift; cmd_config "$@" ;;
   chat)        shift; cmd_chat "$@" ;;
@@ -3184,228 +3157,3 @@ case "${1:-help}" in
   version|--version|-v) echo "Hermes v$VERSION ($CODENAME)" ;;
   *)           err "Unknown command: $1"; cmd_help ;;
 esac
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  AUTONOMOUS ORCHESTRATOR (High Thinking + Coding + Grounding)
-# ═════════════════════════════════════════════════════════════════════════════
-cmd_orchestrator() {
-  local task="$*"
-  [ -z "$task" ] && { err "Usage: hermes orchestrator <complex task>"; return 1; }
-
-  header
-  echo -e "${BOLD}🧠 Autonomous Orchestrator${N}"
-  echo -e "  Task: ${C}$task${N}"
-  echo -e "  Mode: Planner → Researcher → Coder → Reviewer → Tester + Grounding"
-  echo ""
-
-  local workdir="${HERMES_CODE_WORKSPACE:-$(pwd)}"
-  local steps=5
-  local last=""
-
-  for step in $(seq 1 $steps); do
-    echo -e "${Y}── Orchestrator Step $step/$steps ──${N}"
-
-    local prompt="You are Hermes Autonomous Orchestrator (high thinking, coding, grounding).
-Task: $task
-Step: $step of $steps
-Context from previous: $last
-
-Return ONLY valid JSON:
-{
-  \"thought\": \"short reasoning with grounding\",
-  \"role\": \"planner|researcher|coder|reviewer|tester\",
-  \"action\": \"shell|read|write|search|done\",
-  \"command\": \"...\",
-  \"path\": \"...\",
-  \"content\": \"...\",
-  \"grounding\": \"source or reasoning\",
-  \"message\": \"final summary\"
-}"
-
-    local response=$(cmd_ask_internal "$prompt" "You are a precise autonomous orchestrator. Output ONLY compact JSON.")
-    local json=$(printf "%s" "$response" | _extract_json_object)
-
-    if [ -z "$json" ]; then
-      warn "No valid JSON. Raw:"
-      printf "%s\n" "$response" | head -c 400
-      continue
-    fi
-
-    local role=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("role",""))' "$json" 2>/dev/null)
-    local thought=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("thought",""))' "$json" 2>/dev/null)
-    local action=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("action",""))' "$json" 2>/dev/null)
-
-    echo -e "  ${C}Role:${N} $role | ${C}Thought:${N} $thought"
-
-    case "$action" in
-      shell)
-        local cmd=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("command",""))' "$json" 2>/dev/null)
-        echo -e "  ${BOLD}$ $cmd${N}"
-        local out=$(cd "$workdir" && timeout 60 bash -lc "$cmd" 2>&1 | head -50)
-        printf "%s\n" "$out" | sed 's/^/    /'
-        last="shell: $cmd | output: $(echo "$out" | tail -5)"
-        ;;
-      write)
-        local path=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("path",""))' "$json" 2>/dev/null)
-        local content=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("content",""))' "$json" 2>/dev/null)
-        mkdir -p "$(dirname "$workdir/$path")"
-        echo "$content" > "$workdir/$path"
-        ok "Wrote $path"
-        last="wrote: $path"
-        ;;
-      done)
-        local msg=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("message","Done."))' "$json" 2>/dev/null)
-        ok "$msg"
-        return 0
-        ;;
-      *)
-        echo -e "  ${D}Action: $action${N}"
-        ;;
-    esac
-    echo ""
-  done
-  warn "Max steps reached. Continue manually with /agent or hermes coding"
-}
-
-# Auto import to AI Studio / AIS-DEV
-cmd_import_to_aistudio() {
-  local task="${*:-Autonomous Hermes Agent from roc-agentsroute}"
-  header
-  echo -e "${BOLD}📥 Auto Import to AI Studio / AIS-DEV${N}\n"
-
-  echo -e "  Exporting current agent definition to AIS-DEV compatible format..."
-  
-  local agent_def="{
-    \"name\": \"Hermes Autonomous Orchestrator\",
-    \"version\": \"5.9.0\",
-    \"description\": \"High-thinking autonomous agent with coding, grounding, planner-researcher-coder-reviewer-tester loop\",
-    \"source\": \"roc-agentsroute\",
-    \"task\": \"$task\",
-    \"providers\": [\"ais\", \"gateway\", \"gemini\", \"groq\"],
-    \"modes\": [\"autonomous\", \"orchestrator\", \"coding\", \"fast-response\"]
-  }"
-
-  echo "$agent_def" | python3 -m json.tool
-
-  echo ""
-  echo -e "  ${C}To use in AI Studio:${N}"
-  echo -e "    1. Open: ${AIS_DEV}/ or https://aistudio.google.com"
-  echo -e "    2. Paste the JSON above as system prompt or custom agent"
-  echo -e "    3. Or run: hermes studio chat (uses Gemini directly)"
-  echo ""
-  ok "Agent definition ready for import"
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
-#  AUTONOMOUS ORCHESTRATOR (High Thinking + Coding + Grounding + Fast Response)
-# ═════════════════════════════════════════════════════════════════════════════
-cmd_orchestrator() {
-  local task="$*"
-  [ -z "$task" ] && { err "Usage: hermes orchestrator <complex task>"; return 1; }
-
-  header
-  echo -e "${BOLD}🧠 Autonomous Orchestrator${N} — High Thinking + Grounding"
-  echo -e "  Task: ${C}$task${N}"
-  echo -e "  Flow: Planner → Researcher → Coder → Reviewer → Tester + Grounding"
-  echo -e "  Supports: coding, fast response, high thinking, real-world tasks\n"
-
-  local workdir="${HERMES_CODE_WORKSPACE:-$(pwd)}"
-  local steps=6
-  local last=""
-
-  for step in $(seq 1 $steps); do
-    echo -e "${Y}── Step $step/$steps ──${N}"
-
-    local prompt="You are Hermes Autonomous Orchestrator (high-thinking, coding, grounding).
-Task: $task
-Step: $step/$steps
-Previous: $last
-
-Return ONLY compact JSON:
-{
-  \"thought\": \"grounded reasoning\",
-  \"role\": \"planner|researcher|coder|reviewer|tester\",
-  \"action\": \"shell|read|write|search|done\",
-  \"command\": \"...\",
-  \"path\": \"...\",
-  \"content\": \"...\",
-  \"grounding\": \"source/logic\",
-  \"message\": \"summary\"
-}"
-
-    local resp=$(cmd_ask_internal "$prompt" "Output ONLY valid JSON.")
-    local json=$(printf "%s" "$resp" | _extract_json_object 2>/dev/null)
-
-    if [ -z "$json" ]; then
-      warn "Bad JSON from model"
-      last="model returned invalid JSON"
-      continue
-    fi
-
-    local role=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("role",""))' "$json" 2>/dev/null)
-    local action=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("action",""))' "$json" 2>/dev/null)
-    local thought=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("thought",""))' "$json" 2>/dev/null)
-
-    echo -e "  ${C}[$role]${N} $thought"
-
-    case "$action" in
-      shell)
-        local cmd=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("command",""))' "$json" 2>/dev/null)
-        echo -e "  ${BOLD}$ $cmd${N}"
-        local out=$(cd "$workdir" && timeout 90 bash -lc "$cmd" 2>&1 | head -60)
-        printf "    %s\n" "$out"
-        last="shell: $cmd"
-        ;;
-      write)
-        local p=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("path",""))' "$json" 2>/dev/null)
-        local c=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("content",""))' "$json" 2>/dev/null)
-        mkdir -p "$(dirname "$workdir/$p")"
-        echo "$c" > "$workdir/$p"
-        ok "Wrote $p"
-        last="wrote:$p"
-        ;;
-      done)
-        local msg=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("message","Complete"))' "$json" 2>/dev/null)
-        ok "$msg"
-        return 0
-        ;;
-      *)
-        echo -e "  ${D}$action${N}"
-        last="$action"
-        ;;
-    esac
-    echo ""
-  done
-  warn "Max steps reached"
-}
-
-cmd_import_to_aistudio() {
-  local task="${*:-Autonomous Hermes Orchestrator}"
-  header
-  echo -e "${BOLD}📥 Auto Export for Google AI Studio / AIS-DEV${N}\n"
-
-  cat << JSON
-{
-  "name": "Hermes Autonomous Orchestrator",
-  "source": "roc-agentsroute v5.9.0 (patched)",
-  "task": "$task",
-  "modes": ["autonomous", "orchestrator", "coding", "fast-response", "high-thinking", "grounding"],
-  "providers": ["ais", "gateway", "gemini", "groq", "openrouter"],
-  "loop": "Planner → Researcher → Coder → Reviewer → Tester + Grounding",
-  "endpoints": {
-    "ais_dev": "$AIS_DEV",
-    "gateway": "$GATEWAY"
-  },
-  "recommended_model": "gemini-2.5-flash (fast + high thinking)"
-}
-JSON
-
-  echo ""
-  echo -e "${C}How to import:${N}"
-  echo "  1. Open $AIS_DEV or aistudio.google.com"
-  echo "  2. New prompt / custom agent"
-  echo "  3. Paste the JSON as system instructions"
-  echo "  4. Or run: hermes studio chat"
-  echo ""
-  ok "Agent definition ready for AI Studio / AIS-DEV"
-}
