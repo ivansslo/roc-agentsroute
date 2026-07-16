@@ -42,6 +42,11 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# ─── Firebase / Google Credentials ─────────────
+assets/GoogleService-Info.plist
+GoogleService-Info.plist
+google-services.json
+
 # ─── Backups / Patch artifacts ───────────────────
 *.bak
 *.bak.*
