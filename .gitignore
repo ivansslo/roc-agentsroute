@@ -41,3 +41,9 @@ Thumbs.db
 # ─── Logs ────────────────────────────────────────
 *.log
 npm-debug.log*
+
+# ─── Backups / Patch artifacts ───────────────────
+*.bak
+*.bak.*
+hermes.bak.*
+fix_hermes.py

@@ -1,9 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ═══════════════════════════════════════════════
-#  Hermes v5.7.3 Omni — Installer for Termux
+#  Hermes v5.11.0 "Unified" — Installer for Termux
 # ═══════════════════════════════════════════════
 
-echo "⚡ Installing Hermes v5.7.3 Omni..."
+echo "⚡ Installing Hermes v5.11.0 \"Unified\"..."
 
 # Dependencies
 pkg update -y 2>/dev/null
@@ -39,6 +39,8 @@ cat > "$HOME/.hermes/plugins/multi-agent.commands" <<'EOF'
 /best
 /ai
 /plugins
+/orchestrator
+/import
 /reviewer
 /coder
 /tester
@@ -54,9 +56,10 @@ cat > "$HOME/.hermes/plugins/multi-agent.commands" <<'EOF'
 EOF
 
 echo ""
-echo "✅ Hermes installed!"
+echo "✅ Hermes v5.11.0 installed!"
 echo ""
-echo "  Run: hermes setup   (configure API keys)"
-echo "  Run: hermes help    (see all commands)"
-echo "  Run: hermes status  (check connections)"
-echo "  Run: hermes chat    (interactive chat — Termux TTY fixed in v5.7.3)"
+echo "  Run: hermes setup         (configure API keys)"
+echo "  Run: hermes help          (see all commands)"
+echo "  Run: hermes status        (check connections)"
+echo "  Run: hermes chat          (interactive AI chat)"
+echo "  Run: hermes orchestrator  (autonomous agent)"
