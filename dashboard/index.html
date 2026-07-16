@@ -78,6 +78,19 @@
   .links a:hover{border-color:var(--cyan)}
   footer{text-align:center;color:var(--dim);font-size:.7rem;font-family:monospace;padding:14px}
   .offline-dot{background:var(--dim)!important;box-shadow:none!important}
+  /* ── AI Studio App panel ── */
+  .studio{border:1px solid rgba(167,139,250,.45);
+    background:linear-gradient(135deg,rgba(167,139,250,.09),var(--panel) 60%)}
+  .studio-body{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .studio-desc{font-size:.78rem;color:var(--dim);margin-top:6px;line-height:1.65}
+  .studio-note{font-size:.7rem;color:var(--amber)}
+  .studio-actions{display:flex;flex-direction:column;gap:8px;min-width:220px}
+  .bigbtn{background:linear-gradient(135deg,var(--purple),#7c3aed);color:#fff;text-decoration:none;
+    font-weight:700;font-size:.85rem;padding:13px 22px;border-radius:12px;text-align:center;display:inline-block}
+  .bigbtn:hover{filter:brightness(1.15)}
+  .ghost{background:transparent;border:1px solid var(--border);color:var(--dim);
+    padding:8px 14px;border-radius:10px;font-size:.72rem;cursor:pointer;font-family:monospace}
+  .ghost:hover{border-color:var(--purple);color:var(--txt)}
 </style>
 </head>
 <body>
@@ -93,6 +106,22 @@
   </header>
 
   <div class="grid" id="endpoints"></div>
+
+  <div class="panel studio">
+    <div class="studio-body">
+      <div>
+        <h2><span class="ico">🎨</span> AI Studio App — connected</h2>
+        <p class="studio-desc">
+          Applet Google AI Studio Anda — halaman yang sama: <span class="c">ai.studio/apps/90047957-…</span><br>
+          <span class="studio-note">🔒 Private — saat dibuka akan redirect ke login Google akun Anda (itu normal).</span>
+        </p>
+      </div>
+      <div class="studio-actions">
+        <a class="bigbtn" href="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f" target="_blank" rel="noopener">⚡ Buka AI Studio App</a>
+        <button class="ghost" id="copyStudio">salin link</button>
+      </div>
+    </div>
+  </div>
 
   <div class="panel">
     <h2><span class="ico">🔥</span> Firestore — koleksi <span class="c">chats</span></h2>
@@ -131,6 +160,7 @@
       <a href="https://dashboard.roadfx.biz.id" target="_blank" rel="noopener">roc-dashboard</a>
       <a href="https://status.roadfx.biz.id" target="_blank" rel="noopener">status</a>
       <a href="https://ais-dev-jqizmthqeu2hdc4e3pgh63-70765440683.asia-east1.run.app" target="_blank" rel="noopener">ais-dev</a>
+      <a href="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f" target="_blank" rel="noopener">ai-studio-app 🔒</a>
       <a href="https://planning-with-ai-36675.web.app" target="_blank" rel="noopener">firebase-hosting</a>
       <a href="https://github.com/ivansslo/roc-agentsroute" target="_blank" rel="noopener">github</a>
     </div>
@@ -143,6 +173,15 @@
 // ─── Clock ────────────────────────────────────────────────────────────────
 const clockEl = document.getElementById('clock');
 setInterval(()=>{ clockEl.textContent = new Date().toLocaleString('id-ID'); }, 1000);
+
+// ─── Copy AI Studio link ──────────────────────────────────────────────────
+document.getElementById('copyStudio')?.addEventListener('click', function(){
+  const u = 'https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f';
+  const btn = this;
+  const done = () => { btn.textContent = 'tersalin ✓'; setTimeout(()=>btn.textContent='salin link', 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(u).then(done).catch(()=>{ btn.textContent = u; });
+  else btn.textContent = u;
+});
 
 // ─── Endpoint reachability probe (no-cors: opaque = reachable) ────────────
 const EPS = [

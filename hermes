@@ -33,6 +33,7 @@ ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 
 # ─── AI Studio ───────────────────────────────────────────────────────────────
 AI_STUDIO_URL="https://aistudio.google.com/apps/c19a9112-567a-45eb-9d90-af6e02e3c2ae"
+AI_STUDIO_APP="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f"  # applet utama (private — login Google pemilik)
 AI_STUDIO_PROMPT_URL="https://aistudio.google.com/prompts/new_chat"
 
 # ─── Firebase ────────────────────────────────────────────────────────────────
@@ -318,6 +319,7 @@ cmd_config() {
   echo -e "  ${W}AIS-DEV:${N}     $AIS_DEV"
   echo -e "  ${W}Firebase:${N}    $FIREBASE_PROJECT"
   echo -e "  ${W}AI Studio:${N}  $AI_STUDIO_URL"
+  echo -e "  ${W}AI Studio App:${N} $AI_STUDIO_APP"
   echo ""
   echo -e "  ${BOLD}Keys:${N}"
   for k in TOKEN GROQ_KEY OPENAI_KEY OR_KEY GEMINI_KEY CF_TOKEN CF_ACCOUNT GITHUB_PAT MONGO_URI VOYAGE_KEY SOLACE_URL; do
@@ -2838,6 +2840,7 @@ cmd_studio() {
       echo ""
       echo -e "  ${Y}── Google AI Studio ──${N}"
       echo -e "    ${C}$AI_STUDIO_URL${N}"
+      echo -e "    ${C}$AI_STUDIO_APP${N} ${D}(applet utama — private, login Google)${N}"
       echo ""
       echo -e "  ${Y}── Quick Actions ──${N}"
       echo -e "    ${BOLD}hermes studio${N}          Interactive AI Studio"
