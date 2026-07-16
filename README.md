@@ -110,6 +110,14 @@ hermes firebase admin save "halo"     # simpan dokumen (default koleksi: chats)
 
 File kunci **tidak pernah ikut di-push** — `serviceAccountKey.json` sudah masuk `.gitignore`.
 
+**Deploy Hosting (CLI klien, terpisah dari Admin SDK):**
+
+```bash
+npm install -g firebase-tools          # CLI (sudah otomatis via install.sh)
+firebase login --no-localhost          # login headless/Termux
+hermes firebase deploy                 # deploy isi ~/.hermes/workspace
+```
+
 ## 🌐 Endpoints (v5.9.0 — unified router)
 
 All 14 domains route through **roc-site** unified router:
@@ -202,6 +210,9 @@ by Ivan Ssl (ivansslo) — v5.11.1 "Unified"
 - **AIS-DEV endpoint updated** ke deployment baru
   (`ais-dev-jqizmthqeu2hdc4e3pgh63…asia-east1.run.app`, live ✅) — yang lama 404.
 - `.gitignore`: `serviceAccountKey.json` ikut terproteksi.
+- **Firebase CLI (firebase-tools)** otomatis diinstall oleh `install.sh`
+  (skip: `HERMES_NO_FIREBASE_CLI=1`); pesan error `hermes firebase deploy`
+  diperjelas (install → `firebase login --no-localhost` → `firebase init hosting`).
 
 ### v5.11.0 — Repair Release (2026-07-16)
 

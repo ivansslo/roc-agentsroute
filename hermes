@@ -1959,12 +1959,15 @@ else:
     deploy)
       echo -e "  ${B}Deploying to Firebase Hosting...${N}\n"
       if ! command -v firebase &>/dev/null; then
-        warn "Firebase CLI not installed"
-        echo -e "  ${D}Install: npm install -g firebase-tools${N}"
+        warn "Firebase CLI (firebase-tools) belum terinstall"
+        echo -e "  ${D}Install : npm install -g firebase-tools${N}"
+        echo -e "  ${D}Login   : firebase login --no-localhost   (headless/Termux)${N}"
         return 1
       fi
-      cd "$HERMES_WORKSPACE" 2>/dev/null || { err "Workspace not found"; return 1; }
-      firebase deploy --project "$FIREBASE_PROJECT" 2>&1 | sed 's/^/    /'
+      mkdir -p "$HERMES_WORKSPACE"
+      cd "$HERMES_WORKSPACE" 2>/dev/null || { err "Workspace not found: $HERMES_WORKSPACE"; return 1; }
+      [ -f "firebase.json" ] || warn "firebase.json belum ada di $HERMES_WORKSPACE — jalankan: firebase init hosting"
+      firebase deploy --project "${FIREBASE_PROJECT:-}" 2>&1 | sed 's/^/    /'
       ;;
     config)
       echo -e "  ${Y}── Firebase Web Config ──${N}\n"
