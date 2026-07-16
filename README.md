@@ -1,8 +1,8 @@
-# ⚡ Hermes Agent CLI v5.11.1 "Unified"
+# ⚡ Hermes Agent CLI v5.12.0 "Oracle"
 
 **Full AI Agent CLI for Termux** — integrates 100 repositories into one unified command-line tool.
 
-> **v5.11.1** — Firebase Admin SDK (self-serve) + new AIS-DEV endpoint. **v5.11.0** fixed the v5.10.x double-patch damage (see [Changelog](#-changelog)).
+> **v5.12.0** — Oracle VM/WebVirtCloud integration (`hermes vm` + dashboard panel, alias `webvirtcloud.ai.studio`). **v5.11.x** — Firebase Admin SDK, built-in web config, Hermes Dashboard, AI Studio app panel (see [Changelog](#-changelog)).
 
 ## 🚀 Quick Install (Termux)
 
@@ -28,6 +28,8 @@ hermes crew [topic]       # CrewAI multi-agent research
 hermes embed <text>       # Voyage AI embedding
 hermes crawl <url>        # Crawl URL to markdown
 hermes firebase [action]  # Firebase Firestore operations
+hermes dashboard [url|open|deploy] # Web dashboard (AI Studio + Oracle VM panels)
+hermes vm [status]        # Oracle VM WebVirtCloud (alias: webvirtcloud.ai.studio)
 hermes models             # List all AI models
 hermes status             # Full system health check
 hermes deploy [worker]    # Deploy to existing CF Workers (roc-site, hermes-cloudflare)
@@ -196,9 +198,35 @@ hermes status
 
 ---
 
-by Ivan Ssl (ivansslo) — v5.11.1 "Unified"
+by Ivan Ssl (ivansslo) — v5.12.0 "Oracle"
 
 ## 🆕 Changelog
+
+### v5.12.0 — Oracle VM Integration (2026-07-16)
+
+Integrasi **Oracle VM WebVirtCloud** sesuai permintaan "Integrasi oracle VM kesini —
+webvirtcloud.ai.studio". Catatan jujur: subdomain `*.ai.studio` milik Google dan
+tidak bisa di-klaim user, jadi integrasi resmi dibuat di 3 lapis:
+
+- **CLI `hermes vm`** — `status` (live probe 6 endpoint + daftar services dari
+  `/health`), `console`, `wvc`, `kuma`, `monitor`, `novnc`, `ssh`, `tailscale`,
+  `services`. Konstan baru: `VM_IP`, `WVC_URL`, `VM_CONSOLE_URL`, `VM_KUMA_URL`,
+  `VM_NOVNC_URL`, `VM_TAILSCALE_IP`, `AI_STUDIO_WVC_LABEL`; ditampilkan juga di
+  `hermes config`.
+- **Dashboard panel "Oracle VM — WebVirtCloud"** (`dashboard/index.html`) —
+  status VM **live** (host, region, latency, service chips), tombol VM Console
+  (CF), WebVirtCloud, noVNC, Kuma, Monitor, salin-IP, + 2 probe endpoint baru.
+- **Cloudflare HTTPS bridge** di roc-site: `https://vm.roadfx.biz.id/health`
+  → JSON `/health` VM dengan CORS (browser HTTPS tidak boleh fetch `http://IP`
+  — mixed content; Workers `fetch()` ke IP-literal diblokir CF error 1003, jadi
+  bridge memakai **raw TCP socket** `cloudflare:sockets` ke port 80).
+
+### v5.11.2 — Built-in Firebase Config + Dashboard (2026-07-16)
+
+- Firebase web config tertanam (`planning-with-ai-36675`) sebagai default.
+- **Hermes Dashboard** (`dashboard/index.html`) — single-file UI dark theme:
+  endpoint probe, Firestore chat, command cheatsheet, panel **AI Studio App**.
+- `hermes dashboard [url|open|deploy]`; hosting target `planning-with-ai-36675.web.app`.
 
 ### v5.11.1 — Firebase Admin + AIS-DEV endpoint (2026-07-16)
 

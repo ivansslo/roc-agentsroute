@@ -11,8 +11,8 @@
 
 set -uo pipefail
 
-VERSION="5.11.2"
-CODENAME="Unified"
+VERSION="5.12.0"
+CODENAME="Oracle"
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 HERMES_DIR="${HERMES_DIR:-$HOME/.hermes}"
@@ -35,6 +35,22 @@ ISDOCKER="https://isdocker-819208434965.us-west1.run.app"
 AI_STUDIO_URL="https://aistudio.google.com/apps/c19a9112-567a-45eb-9d90-af6e02e3c2ae"
 AI_STUDIO_APP="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f"  # applet utama (private — login Google pemilik)
 AI_STUDIO_PROMPT_URL="https://aistudio.google.com/prompts/new_chat"
+
+# ─── Oracle VM (WebVirtCloud) ───────────────────────────────────────────────
+# Integrasi Oracle Cloud VM — diminta sebagai "webvirtcloud.ai.studio".
+# Catatan: subdomain *.ai.studio milik Google & tidak bisa di-klaim user, jadi
+# panel resmi = Hermes Dashboard + konsol https://vm.roadfx.biz.id/vm
+VM_IP="${VM_IP:-161.118.253.28}"
+VM_WEB_DOMAIN="https://vm.roadfx.biz.id"            # via roc-site (CF Workers)
+VM_HEALTH_URL="http://$VM_IP/health"
+WVC_URL="http://$VM_IP/wvc/"                        # WebVirtCloud panel
+VM_CONSOLE_URL="$VM_WEB_DOMAIN/vm"                  # konsol lengkap (Firebase auth)
+VM_KUMA_URL="http://$VM_IP/kuma/"                   # Uptime Kuma
+VM_MONITOR_URL="http://$VM_IP/monitor/"             # status monitor
+VM_NOVNC_URL="http://$VM_IP/vm/novnc/"              # noVNC console
+VM_TAILSCALE_IP="${VM_TAILSCALE_IP:-100.93.139.73}" # tailnet (butuh tailscale aktif)
+VM_SSH_USER="${VM_SSH_USER:-ubuntu}"
+AI_STUDIO_WVC_LABEL="webvirtcloud.ai.studio"        # alias yang diminta user
 
 # ─── Firebase ────────────────────────────────────────────────────────────────
 # Built-in defaults: project planning-with-ai-36675 (web config — public by design;
@@ -320,6 +336,8 @@ cmd_config() {
   echo -e "  ${W}Firebase:${N}    $FIREBASE_PROJECT"
   echo -e "  ${W}AI Studio:${N}  $AI_STUDIO_URL"
   echo -e "  ${W}AI Studio App:${N} $AI_STUDIO_APP"
+  echo -e "  ${W}Oracle VM:${N}   $VM_IP (ap-singapore-1) · tailnet $VM_TAILSCALE_IP"
+  echo -e "  ${W}VM Console:${N}  $VM_CONSOLE_URL  ${D}(alias: $AI_STUDIO_WVC_LABEL)${N}"
   echo ""
   echo -e "  ${BOLD}Keys:${N}"
   for k in TOKEN GROQ_KEY OPENAI_KEY OR_KEY GEMINI_KEY CF_TOKEN CF_ACCOUNT GITHUB_PAT MONGO_URI VOYAGE_KEY SOLACE_URL; do
@@ -333,6 +351,101 @@ cmd_config() {
   echo ""
   echo -e "  ${W}Model:${N}    ${MODEL:-llama-3.3-70b-versatile}"
   echo -e "  ${W}Provider:${N} ${PROVIDER:-groq}"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  ORACLE VM (WebVirtCloud)  —  alias integrasi: webvirtcloud.ai.studio
+# ═════════════════════════════════════════════════════════════════════════════
+_vm_open() {  # buka URL di browser (Termux / desktop / fallback echo)
+  local url="$1"
+  if command -v termux-open-url &>/dev/null; then
+    termux-open-url "$url" && ok "Opened: $url"
+  elif command -v xdg-open &>/dev/null; then
+    xdg-open "$url" &>/dev/null && ok "Opened: $url"
+  else
+    echo -e "  ${C}$url${N}"
+  fi
+}
+
+_vm_probe() {  # probe URL → print status baris; return 0 jika 2xx/3xx
+  local name="$1" url="$2" code ms t0
+  t0=$(date +%s%N 2>/dev/null || echo 0)
+  code=$(curl -sS -m 8 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo "000")
+  ms=$(( ($(date +%s%N 2>/dev/null || echo 0) - t0) / 1000000 ))
+  case "$code" in
+    2*|3*) printf "    ${G}●${N} %-22s ${G}%s${N} ${D}(%s ms)${N}\n" "$name" "$code" "$ms" ; return 0 ;;
+    401|403) printf "    ${Y}●${N} %-22s ${Y}%s (auth)${N}\n" "$name" "$code" ; return 0 ;;
+    405) printf "    ${Y}●${N} %-22s ${Y}405 (up — butuh method lain)${N}\n" "$name" ; return 0 ;;
+    *) printf "    ${R}●${N} %-22s ${R}%s${N} ${D}$url${N}\n" "$name" "${code:-FAIL}" ; return 1 ;;
+  esac
+}
+
+cmd_vm() {
+  local sub="${1:-status}"; shift 2>/dev/null || true
+  case "$sub" in
+    status|health)
+      header
+      echo -e "${BOLD}🖥️  Oracle VM — WebVirtCloud ${D}(alias: $AI_STUDIO_WVC_LABEL)${N}\n"
+      echo -e "  ${W}Host:${N}      roc-vm · Oracle Cloud ap-singapore-1"
+      echo -e "  ${W}Public IP:${N} $VM_IP"
+      echo -e "  ${W}Tailnet:${N}   $VM_TAILSCALE_IP ${D}(butuh tailscale aktif di device ini)${N}"
+      echo ""
+      echo -e "  ${BOLD}Live probe:${N}"
+      _vm_probe "Health"        "$VM_HEALTH_URL"
+      _vm_probe "VM Console (CF)" "$VM_WEB_DOMAIN/"
+      _vm_probe "WebVirtCloud"  "$WVC_URL"
+      _vm_probe "Uptime Kuma"   "$VM_KUMA_URL"
+      _vm_probe "Monitor"       "$VM_MONITOR_URL"
+      local nv; _vm_probe "noVNC (upstream)" "$VM_NOVNC_URL" || nv=1
+      [ "${nv:-}" = "1" ] || true
+      echo ""
+      local h
+      h=$(curl -sS -m 8 "$VM_HEALTH_URL" 2>/dev/null || true)
+      if [ -n "$h" ]; then
+        echo -e "  ${BOLD}Services${N} ${D}(dari /health)${N}:"
+        if command -v python3 &>/dev/null; then
+          echo "$h" | python3 -c 'import sys,json
+try:
+  d=json.load(sys.stdin)
+  for s in d.get("services",[]): print("    ▸",s)
+except Exception: pass' | sed "s/▸/${C}▸${N}/"
+        else
+          echo "$h" | grep -o '"services":\[[^]]*\]' | tr ',' '\n' | grep -o '"[a-z-]*"' | tr -d '"' | sed "s/^/    ${C}▸${N} /"
+        fi
+        echo ""
+      fi
+      echo -e "  ${D}Aksi cepat: hermes vm console | wvc | kuma | monitor | novnc | ssh | tailscale${N}"
+      ;;
+    console|open) _vm_open "$VM_CONSOLE_URL" ;;
+    wvc|webvirtcloud) _vm_open "$WVC_URL" ;;
+    kuma|uptime)  _vm_open "$VM_KUMA_URL" ;;
+    monitor)      _vm_open "$VM_MONITOR_URL" ;;
+    novnc|vnc)    _vm_open "$VM_NOVNC_URL" ;;
+    studio|aistudio)
+      _vm_open "$AI_STUDIO_APP"
+      echo -e "  ${D}(subdomain ${C}$AI_STUDIO_WVC_LABEL${D} milik Google — tidak bisa di-klaim; panel VM ada di Hermes Dashboard + $VM_CONSOLE_URL)${N}"
+      ;;
+    ssh)
+      echo -e "  ${BOLD}ssh $VM_SSH_USER@$VM_IP${N}  ${D}(atau via tailnet: ssh $VM_SSH_USER@$VM_TAILSCALE_IP)${N}"
+      echo -e "  ${D}Port 22 open · gunakan key OCI Anda (lihat OCI_* di SECRETS-MASTER)${N}"
+      ;;
+    tailscale|ts)
+      echo -e "  ${W}Tailnet IP VM:${N} $VM_TAILSCALE_IP"
+      if command -v tailscale &>/dev/null; then
+        tailscale status 2>/dev/null | head -10 || warn "tailscaled belum jalan — lihat scripts/tailscale-userspace.sh di repo rocspace"
+      else
+        warn "tailscale CLI tidak ditemukan — lihat scripts/tailscale-userspace.sh di repo rocspace"
+      fi
+      ;;
+    services|svc)
+      curl -sS -m 8 "$VM_HEALTH_URL" 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.dumps(d,indent=2))' 2>/dev/null \
+        || curl -sS -m 8 "$VM_HEALTH_URL" 2>/dev/null
+      ;;
+    *)
+      err "Unknown vm subcommand: $sub"
+      echo -e "  ${D}status|console|wvc|kuma|monitor|novnc|studio|ssh|tailscale|services${N}"
+      return 1 ;;
+  esac
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -3308,6 +3421,7 @@ cmd_help() {
   echo -e "    ${BOLD}crawl${N} <url>                Crawl URL to markdown"
   echo -e "    ${BOLD}firebase${N} [status|save|admin] Firebase Firestore (REST atau Admin SDK)"
   echo -e "    ${BOLD}dashboard${N} [url|open|deploy] Web dashboard UI (Firebase Hosting)"
+  echo -e "    ${BOLD}vm${N} [status|console|wvc|kuma|novnc]  Oracle VM WebVirtCloud (alias: webvirtcloud.ai.studio)"
   echo ""
   echo -e "  ${G}Models & Status:${N}"
   echo -e "    ${BOLD}models${N}                     List all available AI models"
@@ -3491,6 +3605,7 @@ case "${1:-help}" in
   isdocker)    shift; cmd_isdocker "$@" ;;
   fix)         shift; cmd_fix "$@" ;;
   dashboard|dash) shift; cmd_dashboard "$@" ;;
+  vm|wvc|oracle|webvirtcloud) shift; cmd_vm "$@" ;;
   help|--help|-h) cmd_help ;;
   version|--version|-v) echo "Hermes v$VERSION ($CODENAME)" ;;
   *)           err "Unknown command: $1"; cmd_help ;;

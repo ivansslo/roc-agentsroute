@@ -91,6 +91,29 @@
   .ghost{background:transparent;border:1px solid var(--border);color:var(--dim);
     padding:8px 14px;border-radius:10px;font-size:.72rem;cursor:pointer;font-family:monospace}
   .ghost:hover{border-color:var(--purple);color:var(--txt)}
+  /* ── Oracle VM panel ── */
+  .oravm{border:1px solid rgba(52,211,153,.4);
+    background:linear-gradient(135deg,rgba(52,211,153,.08),var(--panel) 60%)}
+  .vm-grid{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}
+  @media(max-width:720px){.vm-grid{grid-template-columns:1fr}}
+  .vm-meta{font-family:monospace;font-size:.72rem;color:var(--dim);line-height:2}
+  .vm-meta b{color:var(--green)}
+  .vm-svc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .vm-svc span{font-family:monospace;font-size:.66rem;background:var(--panel2);
+    border:1px solid var(--border);border-radius:99px;padding:4px 10px;color:var(--cyan)}
+  .vm-actions{display:flex;flex-direction:column;gap:8px;min-width:230px}
+  .vmbtn{background:linear-gradient(135deg,var(--green),#10b981);color:#04121a;text-decoration:none;
+    font-weight:700;font-size:.85rem;padding:12px 20px;border-radius:12px;text-align:center;display:inline-block}
+  .vmbtn:hover{filter:brightness(1.15)}
+  .vm-row{display:flex;gap:8px}
+  .vm-row .ghost{flex:1;border-color:rgba(52,211,153,.35);color:var(--txt);text-decoration:none;text-align:center;font-size:.72rem;padding:8px 6px;border-radius:10px}
+  .vm-row .ghost:hover{border-color:var(--green)}
+  .vm-status{font-family:monospace;font-size:.7rem;margin-top:8px;padding:8px 12px;border-radius:8px;
+    border:1px solid var(--border);background:var(--panel2);color:var(--dim)}
+  .vm-status.on{border-color:rgba(52,211,153,.5);color:var(--green)}
+  .vm-status.off{border-color:rgba(248,113,113,.5);color:var(--red)}
+  .var-red,.red{color:var(--red)}
+  .green{color:var(--green)}
 </style>
 </head>
 <body>
@@ -99,8 +122,8 @@
   <header>
     <div>
       <h1><span class="bolt">⚡</span> ROC AgentRoute — Hermes Dashboard
-        <span class="badge">v5.11.2</span></h1>
-      <div class="proj">Firebase Project: <b>planning-with-ai-36675</b> · Firestore + Hosting</div>
+        <span class="badge">v5.12.0</span></h1>
+      <div class="proj">Firebase Project: <b>planning-with-ai-36675</b> · Firestore + Hosting · Oracle VM (webvirtcloud.ai.studio)</div>
     </div>
     <div id="clock">--:--:--</div>
   </header>
@@ -119,6 +142,38 @@
       <div class="studio-actions">
         <a class="bigbtn" href="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f" target="_blank" rel="noopener">⚡ Buka AI Studio App</a>
         <button class="ghost" id="copyStudio">salin link</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel oravm">
+    <h2><span class="ico">🖥️</span> Oracle VM — WebVirtCloud
+      <span class="c" style="font-size:.7rem;font-weight:400">(alias: webvirtcloud.ai.studio)</span></h2>
+    <div class="vm-grid">
+      <div>
+        <div class="vm-meta">
+          Host: <b>roc-vm</b> · Oracle Cloud <b>ap-singapore-1</b><br>
+          Public IP: <b>161.118.253.28</b> <button class="ghost" style="padding:2px 10px;font-size:.62rem" id="copyVmIp">salin IP</button><br>
+          Tailnet: <b>100.93.139.73</b> <span style="color:var(--amber)">(aktifkan tailscale di device untuk akses privat)</span>
+        </div>
+        <div class="vm-status" id="vmStatus">⏳ memeriksa status VM…</div>
+        <div class="vm-svc" id="vmSvc"></div>
+        <p class="studio-desc" style="margin-top:10px;font-size:.68rem">
+          ℹ️ Subdomain <span class="c">*.ai.studio</span> milik Google &amp; tidak bisa di-klaim user — jadi ini panel
+          integrasi resminya: <b>status live</b> via Cloudflare bridge HTTPS + tombol langsung ke setiap service.
+          Konsol lengkap (login Firebase/KVM/noVNC) ada di <span class="c">vm.roadfx.biz.id</span>.
+        </p>
+      </div>
+      <div class="vm-actions">
+        <a class="vmbtn" href="https://vm.roadfx.biz.id/vm" target="_blank" rel="noopener">🖥️ VM Console (CF)</a>
+        <div class="vm-row">
+          <a class="ghost" href="http://161.118.253.28/wvc/" target="_blank" rel="noopener">🛡️ WebVirtCloud</a>
+          <a class="ghost" href="http://161.118.253.28/vm/novnc/" target="_blank" rel="noopener">🖧 noVNC</a>
+        </div>
+        <div class="vm-row">
+          <a class="ghost" href="http://161.118.253.28/kuma/" target="_blank" rel="noopener">📊 Kuma</a>
+          <a class="ghost" href="http://161.118.253.28/monitor/" target="_blank" rel="noopener">📈 Monitor</a>
+        </div>
       </div>
     </div>
   </div>
@@ -145,6 +200,8 @@
       <div><b>hermes firebase status</b> — info + data Firestore</div>
       <div><b>hermes firebase admin</b> — Admin SDK (service account)</div>
       <div><b>hermes firebase admin save "…"</b> — simpan dokumen</div>
+      <div><b>hermes vm status</b> — Oracle VM WebVirtCloud live</div>
+      <div><b>hermes vm console</b> — buka VM Console (CF)</div>
       <div><b>hermes dashboard deploy</b> — deploy dashboard ini</div>
       <div><b>hermes status</b> — health check penuh</div>
       <div><b>hermes models</b> — daftar model AI</div>
@@ -161,12 +218,17 @@
       <a href="https://status.roadfx.biz.id" target="_blank" rel="noopener">status</a>
       <a href="https://ais-dev-jqizmthqeu2hdc4e3pgh63-70765440683.asia-east1.run.app" target="_blank" rel="noopener">ais-dev</a>
       <a href="https://ai.studio/apps/90047957-bcb6-4808-8e03-3df0c091f88f" target="_blank" rel="noopener">ai-studio-app 🔒</a>
+      <a href="https://vm.roadfx.biz.id/vm" target="_blank" rel="noopener">vm-console 🖥️</a>
+      <a href="https://vm.roadfx.biz.id/health" target="_blank" rel="noopener">vm-health-json</a>
+      <a href="http://161.118.253.28/wvc/" target="_blank" rel="noopener">webvirtcloud 🛡️</a>
+      <a href="http://161.118.253.28/kuma/" target="_blank" rel="noopener">kuma 📊</a>
+      <a href="http://161.118.253.28/monitor/" target="_blank" rel="noopener">monitor 📈</a>
       <a href="https://planning-with-ai-36675.web.app" target="_blank" rel="noopener">firebase-hosting</a>
       <a href="https://github.com/ivansslo/roc-agentsroute" target="_blank" rel="noopener">github</a>
     </div>
   </div>
 
-  <footer>⚡ by Ivan Ssl (ivansslo) — ROC AgentRoute v5.11.2 "Unified" · dibuat 16 Juli 2026</footer>
+  <footer>⚡ by Ivan Ssl (ivansslo) — ROC AgentRoute v5.12.0 "Oracle" · dibuat 16 Juli 2026</footer>
 </div>
 
 <script type="module">
@@ -183,6 +245,42 @@ document.getElementById('copyStudio')?.addEventListener('click', function(){
   else btn.textContent = u;
 });
 
+// ─── Oracle VM: copy IP + live status via CF HTTPS bridge ──────────────────
+document.getElementById('copyVmIp')?.addEventListener('click', function(){
+  const btn = this;
+  const done = () => { btn.textContent = 'tersalin ✓'; setTimeout(()=>btn.textContent='salin IP', 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText('161.118.253.28').then(done).catch(()=>{ btn.textContent='161.118.253.28'; });
+  else btn.textContent = '161.118.253.28';
+});
+
+(async function vmLive(){
+  const el = document.getElementById('vmStatus');
+  const svc = document.getElementById('vmSvc');
+  if (!el) return;
+  const t0 = performance.now();
+  try {
+    const ctl = new AbortController(); setTimeout(()=>ctl.abort(), 8000);
+    const r = await fetch('https://vm.roadfx.biz.id/health?b='+Date.now(), {signal:ctl.signal, cache:'no-store'});
+    const d = await r.json();
+    const ms = Math.round(performance.now()-t0);
+    if (d.status === 'ok') {
+      el.className = 'vm-status on';
+      el.textContent = `● VM ONLINE — ${d.host} · ${d.region} · ${ms} ms (via Cloudflare bridge)`;
+      (d.services||[]).forEach(s=>{
+        const chip = document.createElement('span');
+        chip.textContent = '▸ '+s;
+        svc.appendChild(chip);
+      });
+    } else {
+      el.className = 'vm-status off';
+      el.textContent = '● VM bermasalah: '+JSON.stringify(d);
+    }
+  } catch(e) {
+    el.className = 'vm-status off';
+    el.textContent = '● VM tidak terjangkau / bridge error (cek https://vm.roadfx.biz.id/health)';
+  }
+})();
+
 // ─── Endpoint reachability probe (no-cors: opaque = reachable) ────────────
 const EPS = [
   ['Gateway (primary)','https://ai.roadfx.biz.id'],
@@ -192,6 +290,9 @@ const EPS = [
   ['Status (Kuma)','https://status.roadfx.biz.id'],
   ['AIS-DEV','https://ais-dev-jqizmthqeu2hdc4e3pgh63-70765440683.asia-east1.run.app'],
   ['Firebase Hosting','https://planning-with-ai-36675.web.app'],
+  ['Oracle VM Console','https://vm.roadfx.biz.id'],
+  ['Oracle VM Health (CF bridge)','https://vm.roadfx.biz.id/health'],
+  ['Monitor','https://monitor.roadfx.biz.id'],
   ['Cloud Run (legacy)','https://ai-vitality-819208434965.us-west1.run.app'],
 ];
 const grid = document.getElementById('endpoints');
